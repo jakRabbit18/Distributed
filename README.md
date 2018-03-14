@@ -1,2 +1,2 @@
-# Algorithms
-A place to keep practice algorithms and play with them
+# Distributed
+programming Assignments for WPI Distributed Systems course
