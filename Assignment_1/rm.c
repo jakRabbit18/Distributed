@@ -12,7 +12,7 @@
 // Additionally, it will take 1..* filenames in the command line
 
 // TODO:
-// 		- if a directory is specified to be removed but not recursively, is this an error?
+// 		- if a directory is specified to be removed but not recursively, this is an error
 // 		- do we need to understand the order of options/filenames:
 //			rm foo.txt -f bar.c
 //			 does the above only force remove bar.c? Does it throw an error?
@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
+
 #define FALSE 0
 #define TRUE 1
 
@@ -53,20 +55,45 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	char *dumster = getenv("DUMPSTER");
-	int dumpsterpath_length = strlen(dumster);
+	const char *dumpster = getenv("DUMPSTER");
 
-	printf("Dumpster: %s\n", dumster);
+	printf("Dumpster: %s\n", dumpster);
 	printf("Force: %i\nHelp: %i\nRecursive: %i\n", force, help, recursive);
 	printf("NumFiles: %i\n", numfiles);
+
+	if(force){
+		//here we punt to the og rm function
+		int x = 1;
+	}
 	
 	for(int i =0; i < numfiles; i ++){
 		printf("file: %s\n", filenames[i]);
 
-		// thisis the bit that actually moves the file to the dumpster
-		dumpsterPathLength += strlen(filenames[i]) + 1;
-		dumpsterPath[dumpsterPathLength];
-		strcat(dumpsterPath)
+		// thisis the bit that actually moves the file  the dumpster
+		int dumpsterPathLength = strlen(dumpster);
+		dumpsterPathLength += strlen(filenames[i]) + 4; // to cover new null terminator, extra forward slash, possible num extension
+		printf("Dumpster path length: %i\n", dumpsterPathLength);
+		
+		// build the new string for the dumpster pathname
+		char *dumpsterPath = malloc(sizeof(char) * dumpsterPathLength);
+		sprintf(dumpsterPath, "%s/%s", dumpster, filenames[i])
+		// strcat(dumpsterPath, dumpster);
+		// strcat(dumpsterPath, "/");
+		// strcat(dumpsterPath, filenames[i]);
+		printf("New Name: %s\n", dumpsterPath);
+
+		//check if the file already exists
+		int fileExists = access(dumpsterPath, F_OK);
+		if(fileExists == 0) {
+			printf("file already exists!\n");
+			strcat(dumpsterPath, ".1");
+		} 
+		
+		//now rename the file
+		int result = rename(filenames[i], dumpsterPath);
+		printf("rename result: %i\n", result);
+
+		free(dumpsterPath);
 	}
 
 
