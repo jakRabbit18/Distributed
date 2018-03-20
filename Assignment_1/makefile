@@ -1,7 +1,12 @@
 # makefile for distributed project 1
 
-all:
+all: rm
+	
+rm: rm.c
 	gcc rm.c -o rm
 
+dv: dv.c
+	gcc dv.c -o dv
+
 clean:
-	rm *o rm
+	rm rm dv
