@@ -38,8 +38,6 @@ int student_rm(){
 	return 0;
 }
 
-
-
 int main(int argc, char **argv) {
 
 	char force = FALSE;
