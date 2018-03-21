@@ -26,15 +26,96 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <limits.h>
+#include <ftw.h>
+#include <errno.h>
 
 #define FALSE 0
 #define TRUE 1
 
+extern int errno;
+
+//list which will hold paths of directories for later deletion
+struct Node *start = NULL;
+/* A linked list node */
+//https://www.geeksforgeeks.org/generic-linked-list-in-c-2/
+struct Node
+{
+    // Any data type can be stored in this node
+    void  *data;
+ 
+    struct Node *next;
+};
+
 int student_rm();
 int copy_file();
+int copy_item(const char *fpath, const struct stat *sb, int tflag);
+int delete_dir(const char *fpath, const struct stat *sb, int tflag);
 char get_extension(const char*);
 
 int student_rm(){
+	return 0;
+}
+
+/* Function to add a node at the beginning of Linked List.
+   This function expects a pointer to the data to be added
+   and size of the data type */
+void push(struct Node** head_ref, void *new_data, size_t data_size)
+{
+    // Allocate memory for node
+    struct Node* new_node = (struct Node*)malloc(sizeof(struct Node));
+ 
+    new_node->data  = malloc(data_size);
+    new_node->next = (*head_ref);
+ 
+    // Copy contents of new_data to newly allocated memory.
+    // Assumption: char takes 1 byte.
+    int i;
+    for (i=0; i<data_size; i++)
+        *(char *)(new_node->data + i) = *(char *)(new_data + i);
+ 
+    // Change head pointer as new node is added at the beginning
+    (*head_ref)    = new_node;
+}
+
+void delete_directories(struct Node *node){
+	while(node != NULL){
+		rmdir((char*)node->data);
+		printf("node path: %s\n", (char*)node->data);
+		node = node->next;
+	}
+}
+
+// with reference from:
+// https://stackoverflow.com/questions/2256945/removing-a-non-empty-directory-programmatically-in-c-or-c
+int copy_item(const char *fpath, const struct stat *sb, int tflag){
+	printf("path: %s\n", fpath);
+	const char *dumpster = getenv("DUMPSTER");
+	// thisis the bit that actually moves the file  the dumpster
+	int dumpsterPathLength = strlen(dumpster);
+	dumpsterPathLength += strlen(fpath) + 4; // to cover new null terminator, extra forward slash, possible num extension
+	printf("Dumpster path length: %i\n", dumpsterPathLength);
+	
+	// build the new string for the dumpster pathname
+	char *dumpsterPath = malloc(sizeof(char) * dumpsterPathLength);
+	sprintf(dumpsterPath, "%s/%s", dumpster, fpath);
+		printf("New Name: %s\n", dumpsterPath);
+	//if we are walking over a directory, create a new empty dir under the dumpster
+	if(tflag == FTW_D){
+		struct stat st = {0};
+		if(stat(dumpsterPath, &st) == -1){
+			mkdir(dumpsterPath, 0700);
+			push(&start, (void*)fpath, sizeof(char) * strlen(fpath) + 4);
+		}
+	}
+	//if we are walking over a file, unlink it then link it to dumpster path
+	else if(tflag == FTW_F){
+		int result;
+		if(!(access(dumpsterPath, F_OK) != -1)){
+			result = rename(fpath, dumpsterPath);
+		}
+		printf("rename result: %d\n", result);
+	}
 	return 0;
 }
 
@@ -81,6 +162,10 @@ int main(int argc, char **argv) {
 				// for now we'll just keep track of the directories
 				// adding handling for them will come later. Probably a monday afternoon project
 				dirnames[numDirs++] = argv[i];
+				printf("dir: %s\n", argv[i]);
+				ftw(argv[i], copy_item, 1);
+				//delete remaining empty directories by referencing LL
+				delete_directories(start);
 			}
 
 			//TODO: add error message if the pathname is neither a valid file or directory
