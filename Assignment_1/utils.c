@@ -38,9 +38,11 @@ int getNumFiles(const char *directory, char *filename) {
 
 int checkFileExt(const char *filename) {
 	char *fileExt = strrchr(filename,'.');
-	fileExt++;
-	int ext;
-	ext = atoi(fileExt);
+	int ext = 0;
+	if(fileExt){
+		fileExt++;
+		ext = atoi(fileExt);
+	}
 	printf("File extention: %s\t%d\n", fileExt, ext);
 	return ext;
 }

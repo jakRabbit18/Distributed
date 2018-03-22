@@ -90,15 +90,16 @@ int myDump(char *baseDir){
 			// directory and check if they're files/directories
 			printf("Current Entry: %s\n", ent->d_name);
 			int ext = checkFileExt(ent->d_name);
-			char *name = malloc(sizeof(char) * strlen(ent->d_name) + 1);
-			name = strcpy(name, ent->d_name);
+			char *name = malloc((sizeof(char) * strlen(ent->d_name)) + (sizeof(char) * strlen(baseDir)) + 1);
+			printf("full name: %s\n", name);
+			sprintf(name, "%s/%s", baseDir, ent->d_name);
 			if(ext) {
 				int len = strlen(name);
 				name[len-2] = '\0';
 			}
+			printf("checked for ext: %s\n", name);
 			struct stat entStat;
 			int res = stat(name, &entStat);
-			printf("checked for ext: %s\n", name);
 			if(res != 0) {
 				printf("stat result: %d:", res);
 				printf("%s\n", strerror(errno));
@@ -106,22 +107,19 @@ int myDump(char *baseDir){
 
 			// Get rid of this entry if it is a file
 			if(S_ISREG(entStat.st_mode)){
-				printf("Attempt to remove %s\n", ent->d_name);
-				int res = removeFile(ent->d_name);
-				printf("Remove %s result: %d\n", ent->d_name, res);
+				printf("Attempt to remove %s\n", name);
+				int res = removeFile(name);
+				printf("Remove %s result: %d\n", name, res);
 			}
 
 			// Call myDump on this if it is a directory. Once it returns, delete it
 			else if(S_ISDIR(entStat.st_mode)) {
-				int name_len = strlen(ent->d_name) + 1;
-				char *name = malloc(sizeof(char) * name_len);
-				name = strcpy(name, ent->d_name);
 				printf("Directory name: %s\n", name);
 				collecteddirs[numDirs] = name;
-				if(strcmp(name, "..") != 0 && strcmp(name, ".") != 0){
+				if(strcmp(ent->d_name, "..") != 0 && strcmp(ent->d_name, ".") != 0){
 					printf("deleting...\n");
 					int success_delete = myDump(name);
-					rmdir(name);
+					// rmdir(name);
 				}
 			}
 
