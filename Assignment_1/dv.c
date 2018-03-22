@@ -220,32 +220,54 @@ int main(int argc, char **argv) {
 	char help = FALSE;
 	char is_file_list = FALSE;
 	// Check command line options
-	
+	char *dumpster = getenv("DUMPSTER");
+	if(dumpster == NULL) {
+		printf("No dumpser specified, specify dumpster to use dv");
+		return -1;
+	}
+
 	char **filenames = malloc(sizeof(char *) * argc); // use this array to accumulate the filenames
 	int numfiles = 0;
 	for(int i = 0; i < argc; i++){
 		printf("argv[%d]: %s\n", i, argv[i]);
-		if(strcmp(argv[i], "file") == 0){
-			is_file_list = TRUE;
-		}
+		// if(strcmp(argv[i], "file") == 0){
+		// 	is_file_list = TRUE;
+		// }
 
-		else if(strcmp(argv[i], "-h") == 0){
+		// else 
+		if(strcmp(argv[i], "-h") == 0){
 			help = TRUE;
 		}
 
 		else if(i > 0) {
 
-			// check if the arg is a filename
-			if(is_file_list){
-				printf("Regular file: %s\n", argv[i]);
-				filenames[numfiles++] = argv[i];
+			// since the file doesn't exist in this directory we need 
+			// to check that it exists in the dumpster. For that we need
+			// to figure out what the path in the dumpster would be
+			// for now, lets assume that if you want a specific file
+			// that isn't directly under the dumpster, you'll give the
+			// path to that file relative to the directory under the dumpster
+			// in which to look for it 
+			char name[strlen(dumpster) + strlen(argv[i]) + 2]; // covers / and null term
+			sprintf(name, "%s/%s", dumpster, argv[i]);
+
+			struct stat fstat;
+			int fres = stat(name, &fstat);
+
+			if(fres) {
+				perror(strerror(errno));
+				continue;
 			}
-			else{
-				//directory
-				printf("dir: %s\n", argv[i]);
+
+			if(S_ISREG(fstat.st_mode)) {
+				printf("Regular file: %s\n", name);
+				filenames[numfiles++] = argv[i];
+
+			}
+			else if (S_ISDIR(fstat.st_mode)) {
+				printf("dir: %s\n", name);
 				restore_directory(argv[i]);
 			}
-			//TODO: add error message if the pathname is neither a valid file or directory
 		}
 	}
 

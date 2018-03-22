@@ -105,7 +105,7 @@ void delete_directories(struct Node *node){
 int copy_item(const char *fpath, const struct stat *sb, int tflag){
 	printf("path: %s\n", fpath);
 	const char *dumpster = getenv("DUMPSTER");
-	// thisis the bit that actually moves the file  the dumpster
+	
 	int dumpsterPathLength = strlen(dumpster);
 	dumpsterPathLength += strlen(fpath) + 4; // to cover new null terminator, extra forward slash, possible num extension
 	printf("Dumpster path length: %i\n", dumpsterPathLength);
@@ -113,14 +113,15 @@ int copy_item(const char *fpath, const struct stat *sb, int tflag){
 	// build the new string for the dumpster pathname
 	char *dumpsterPath = malloc(sizeof(char) * dumpsterPathLength);
 	sprintf(dumpsterPath, "%s/%s", dumpster, fpath);
-		printf("New Name: %s\n", dumpsterPath);
+	printf("New Name: %s\n", dumpsterPath);
 	//if we are walking over a directory, create a new empty dir under the dumpster
 	if(tflag == FTW_D){
+		printf("this is a directory\n");
 		struct stat st = {0};
 		if(stat(dumpsterPath, &st) == -1){
 			mkdir(dumpsterPath, 0700);
-			push(&start, (void*)fpath, sizeof(char) * strlen(fpath) + 4);
 		}
+		push(&start, (void*)fpath, sizeof(char) * strlen(fpath) + 4);
 	}
 	//if we are walking over a file, unlink it then link it to dumpster path
 	else if(tflag == FTW_F){
@@ -161,6 +162,9 @@ int copyfile(char *source, char *dest) {
 
 		if(!src_res && !dest_res) {
 			dest_res = chmod(dest, src_stat.st_mode);
+		} else {
+			printf("Stat ran into an issue, %s\n", strerror(errno));
+			return -1;
 		}
 
 		// do the same with access times
@@ -181,87 +185,84 @@ int copyfile(char *source, char *dest) {
 // the following is based on a solution for reading dir from StackOverflow answer here:
 // https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
 int removeFile(char *filename) {
-		// this is the bit that actually moves the file  the dumpster
-		int dumpsterPathLength = strlen(dumpster);
-		dumpsterPathLength += strlen(filename) + 4; // to cover new null terminator, extra forward slash, possible num extension
-		printf("Dumpster path length: %i\n", dumpsterPathLength);
-		
-		// build the new string for the dumpster pathname
-		char *dumpsterPath = malloc(sizeof(char) * dumpsterPathLength);
-		sprintf(dumpsterPath, "%s/%s", dumpster, basename(filename));
-		
+	// this is the bit that actually moves the file  the dumpster
+	int dumpsterPathLength = strlen(dumpster);
+	dumpsterPathLength += strlen(filename) + 4; // to cover new null terminator, extra forward slash, possible num extension
+	printf("Dumpster path length: %i\n", dumpsterPathLength);
 	
-		// figure out if this ends in a number or not
-		int ext = checkFileExt(filename);
-		
-		if(ext) {
-			printf("we found a digit\n");
-			// the end of the file was in fact a .num (we assume) so strip the extension
-			int len = strlen(filename);
-			filename[len-2] = '\0';
+	// build the new string for the dumpster pathname
+	char *dumpsterPath = malloc(sizeof(char) * dumpsterPathLength);
+	sprintf(dumpsterPath, "%s/%s", dumpster, basename(filename));
+	
+
+	// figure out if this ends in a number or not
+	int ext = checkFileExt(filename);
+	
+	if(ext) {
+		// the end of the file was in fact a .num so strip the extension
+		int len = strlen(filename);
+		filename[len-2] = '\0';
+	}
+	int numFiles = getNumFiles(dumpster, basename(filename));
+	
+	// if the extension was valid, we in business
+	if(ext) {
+		printf("we found a digit\n");
+		// the end of the file was in fact a .num (we assume) so strip the extension
+		numFiles ++;
+		int len = strlen(dumpsterPath);
+		dumpsterPath[len-2] = '\0';
+	}
+
+	if(numFiles && numFiles < 10){
+		printf("%s\n", dumpsterPath);
+		sprintf(dumpsterPath, "%s.%i", dumpsterPath, numFiles);
+	} else if (numFiles) {
+		printf("Dumpser full of %s\n", filename);
+	}
+
+	printf("New Name: %s\n", dumpsterPath);
+
+	// now rename the file
+	// just renaming doesn't do anything if the deleted file is on a separate disk
+	// so we first add the new link, and then we delete the old link
+	struct stat file_stat;
+	struct stat dump_stat;
+	int file_res = stat(filename, &file_stat);
+	int dump_res = stat(dumpster, &dump_stat);
+	int linkResult, unlinkResult;
+
+	if(file_res == 0) {
+		printf("no stat for %s, %s\n", filename, strerror(errno));
+	}
+	if(!file_res && !dump_res && file_stat.st_dev != dump_stat.st_dev){
+		// the files are not on the same partition
+		printf("File stat: %ld\tDump Stat: %ld\n", file_stat.st_dev, dump_stat.st_dev);
+		int copyRes = copyfile(filename, dumpsterPath);
+		if(copyRes) {
+			printf("copy error, %s\n", strerror(errno));
+			return -1;
+		}
+		unlinkResult= unlink(filename);
+		if(unlinkResult) {
+			printf("Unlink error: %s\n", strerror(errno));
+			return -1;
 		}
 
-		int numFiles = getNumFiles(dumpster, basename(filename));
-		
-		// if the extension was valid, we in business
-		if(ext) {
-			printf("we found a digit\n");
-			// the end of the file was in fact a .num (we assume) so strip the extension
-			numFiles ++;
-			int len = strlen(dumpsterPath);
-			dumpsterPath[len-2] = '\0';
+	} else {
+		linkResult = link(filename, dumpsterPath);
+		if(linkResult) {
+			printf("Link error: %s\n", strerror(errno));
+			return -1;
 		}
-
-		if(numFiles && numFiles < 10){
-			printf("%s\n", dumpsterPath);
-			sprintf(dumpsterPath, "%s.%i", dumpsterPath, numFiles);
-		} else if (numFiles) {
-			// dumpster is full of this filename, print error and return
-			// TODO
+		unlinkResult= unlink(filename);
+		if(unlinkResult) {
+			printf("Unlink error: %s\n", strerror(errno));
+			return -1;
 		}
-		printf("New Name: %s\n", dumpsterPath);
-
-		// now rename the file
-		// just renaming doesn't do anything if the deleted file is on a separate disk
-		// so we first add the new link, and then we delete the old link
-		// TODO: add check for disk change
-		struct stat file_stat;
-		struct stat dump_stat;
-		int file_res = stat(filename, &file_stat);
-		int dump_res = stat(dumpster, &dump_stat);
-		int linkResult, unlinkResult;
-
-		if(file_res == 0) {
-			printf("no stat for %s, %s\n", filename, strerror(errno));
-		}
-		if(!file_res && !dump_res && file_stat.st_dev != dump_stat.st_dev){
-			// the files are on the same partition
-			printf("File stat: %ld\tDump Stat: %ld\n", file_stat.st_dev, dump_stat.st_dev);
-			int copyRes = copyfile(filename, dumpsterPath);
-			if(copyRes) {
-				printf("copy error, %s\n", strerror(errno));
-				return -1;
-			}
-			unlinkResult= unlink(filename);
-			if(unlinkResult) {
-				printf("Unlink error: %s\n", strerror(errno));
-				return -1;
-			}
-
-		} else {
-			linkResult = link(filename, dumpsterPath);
-			if(linkResult) {
-				printf("Link error: %s\n", strerror(errno));
-				return -1;
-			}
-			unlinkResult= unlink(filename);
-			if(unlinkResult) {
-				printf("Unlink error: %s\n", strerror(errno));
-				return -1;
-			}
-		}
-		free(dumpsterPath);
-		return 0;
+	}
+	free(dumpsterPath);
+	return 0;
 }
 
 int removeAllFilesInList(int numfiles, char **filenames, const char force) {
@@ -277,7 +278,11 @@ int removeAllFilesInList(int numfiles, char **filenames, const char force) {
 			continue;
 
 		} else {
-			removeFile(filenames[i]);
+			// this is our remove file
+			int rem_res = removeFile(filenames[i]);
+			if(rem_res) {
+				printf("ERROR: Could not remove %s\n", filenames[i]);
+			}
 		}
 	}
 	return 0;
@@ -297,7 +302,7 @@ int main(int argc, char **argv) {
 	int numDirs = 0;
 
 	for(int i = 0; i < argc; i++){
-		printf("argv[%d]: %s\n", i, argv[i]);
+		// printf("argv[%d]: %s\n", i, argv[i]);
 
 		if(strcmp(argv[i], "-f") == 0){
 			force = TRUE;
@@ -319,6 +324,7 @@ int main(int argc, char **argv) {
 			int stat_res = stat(argv[i], &argStats);
 			if(stat_res) {
 				perror(strerror(errno));
+				continue;
 			}
 			// check if the arg is a filename
 			if(!stat_res && S_ISREG(argStats.st_mode)){
@@ -353,10 +359,6 @@ int main(int argc, char **argv) {
 		perror("No dumpster declared\n");
 		return -1;
 	}
-
-	printf("Dumpster: %s\n", dumpster);
-	printf("Force: %i\nHelp: %i\nRecursive: %i\n", force, help, recursive);
-	printf("NumFiles: %i\n", numfiles);
 
 	// remove all the top level filenames
 	removeAllFilesInList(numfiles, filenames, force);
