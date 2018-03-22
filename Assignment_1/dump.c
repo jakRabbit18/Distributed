@@ -76,7 +76,8 @@ int myDump(char *baseDir){
 
 			// make the filename friendly for playing with stat
 			int ext = checkFileExt(ent->d_name);
-			char *name = malloc((sizeof(char) * strlen(ent->d_name)) + (sizeof(char) * strlen(baseDir)) + 1);
+			// char *name = malloc((sizeof(char) * strlen(ent->d_name)) + (sizeof(char) * strlen(baseDir)) + 1);
+			char name[strlen(ent->d_name) + strlen(baseDir) + 2];
 			sprintf(name, "%s/%s", baseDir, ent->d_name);
 			// printf("full name: %s\n", name);
 			if(ext) {
@@ -105,15 +106,13 @@ int myDump(char *baseDir){
 						return delete_error;
 					}
 					printf("deleting %s\n", name);
-					// rmdir(name);
+					rmdir(name);
 				}
 			}
 			// free(name);
-			free(name);
 		}
 		// closedir(dir);
 	}
-	// closedir(dir);
 
 	// if((dir = opendir(baseDir))!=NULL) {
 	// 	while((ent = readdir(dir)) != NULL) {
