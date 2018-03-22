@@ -44,6 +44,7 @@
 #include <ftw.h>
 #include <errno.h>
 #include <libgen.h>
+#include <ctype.h>
 
 #define FALSE 0
 #define TRUE 1
@@ -64,8 +65,6 @@ struct Node
 
 char *dumpster;
 
-
-int copy_file();
 int copy_item(const char *fpath, const struct stat *sb, int tflag);
 int delete_dir(const char *fpath, const struct stat *sb, int tflag);
 char get_extension(const char*);
@@ -133,12 +132,12 @@ int copy_item(const char *fpath, const struct stat *sb, int tflag){
 	return 0;
 }
 
-
 //return the number of files in the given directory
 int getNumFiles(const char *directory, char *filename) {
 	int numFiles = 0; // we don't already know if there's one of these files here
 	DIR *dir;
 	struct dirent *ent;
+	printf("File to count: %s\n", filename);
 	// try to open the dumster directory,
 	// this shouldn't be an issue by now, 
 	// but just to be sure...
@@ -156,7 +155,6 @@ int getNumFiles(const char *directory, char *filename) {
 			printf("Ent name: %s\n", ent->d_name);
 			if(strcmp(name, filename) == 0 || strcmp(ent->d_name, filename) == 0) {
 				// we've found another instance of this filename! increase our count
-				printf("file already exists %i times!\n", numFiles);
 				numFiles ++;
 			}
 		}
@@ -166,6 +164,36 @@ int getNumFiles(const char *directory, char *filename) {
 	return numFiles;
 }
 
+
+// copies a given file from source to dest
+int copyfile(char *source, char *dest) {
+	FILE *srcf, *destf;
+	int c;
+	srcf = fopen(source, "r");
+	destf = fopen(dest, "w");
+	if(!srcf) {
+		printf("Couldn't open the file %s to copy it to the dumpster\n", source);
+		return -1;
+	}
+	if(!destf) {
+		printf("Couldn't open the file %s to recieve the copy\n", dest);
+		return -1;
+	}
+
+	if(destf && srcf) {
+		while((c = getc(srcf))!= EOF) {
+			putc(c, destf);
+		}
+		fclose(destf);
+		fclose(srcf);
+		return 0;
+	}
+	printf("something else went wrong I guess\n");
+	return -1;
+}
+
+// the following is based on a solution for reading dir from StackOverflow answer here:
+// https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
 int removeFile(char *filename) {
 		// this is the bit that actually moves the file  the dumpster
 		int dumpsterPathLength = strlen(dumpster);
@@ -175,11 +203,35 @@ int removeFile(char *filename) {
 		// build the new string for the dumpster pathname
 		char *dumpsterPath = malloc(sizeof(char) * dumpsterPathLength);
 		sprintf(dumpsterPath, "%s/%s", dumpster, basename(filename));
-		// the following is based on a solution for reading dir from StackOverflow answer here:
-		// https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
 		
-		int numFiles = getNumFiles(dumpster, filename);
+	
+		// figure out if this ends in a number or not
+		char *fileExt = strrchr(filename,'.');
+		fileExt++;
+		int ext;
+		ext = atoi(fileExt);
+		printf("File extention: %s\t%d\n", fileExt, ext);
+		
+		if(ext) {
+			printf("we found a digit\n");
+			// the end of the file was in fact a .num (we assume) so strip the extension
+			int len = strlen(filename);
+			filename[len-2] = '\0';
+		}
+
+		int numFiles = getNumFiles(dumpster, basename(filename));
+		
+		// if the extension was valid, we in business
+		if(ext) {
+			printf("we found a digit\n");
+			// the end of the file was in fact a .num (we assume) so strip the extension
+			numFiles ++;
+			int len = strlen(dumpsterPath);
+			dumpsterPath[len-2] = '\0';
+		}
+
 		if(numFiles && numFiles < 10){
+			printf("%s\n", dumpsterPath);
 			sprintf(dumpsterPath, "%s.%i", dumpsterPath, numFiles);
 		} else if (numFiles) {
 			// dumpster is full of this filename, print error and return
@@ -187,7 +239,7 @@ int removeFile(char *filename) {
 		}
 		printf("New Name: %s\n", dumpsterPath);
 
-		//now rename the file
+		// now rename the file
 		// just renaming doesn't do anything if the deleted file is on a separate disk
 		// so we first add the new link, and then we delete the old link
 		// TODO: add check for disk change
@@ -195,22 +247,39 @@ int removeFile(char *filename) {
 		struct stat dump_stat;
 		int file_res = stat(filename, &file_stat);
 		int dump_res = stat(dumpster, &dump_stat);
-		if(!file_res && !dump_res && file_stat.st_dev == dump_stat.st_dev){
-			// the files are on the same partition... I think?
-			printf("File stat: %ld\tDump Stat: %ld\n", file_stat.st_dev, dump_stat.st_dev);
-		}
-		int linkResult = link(filename, dumpsterPath);
-		if(linkResult) {
-			printf("Link error: %s\n", strerror(errno));
-			return -1;
-		}
-		int unlinkResult= unlink(filename);
-		if(unlinkResult) {
-			printf("Unlink error: %s\n", strerror(errno));
-		}
-		printf("link/unlink results: %i\t%i\n", linkResult, unlinkResult);
-		free(dumpsterPath);
+		int linkResult, unlinkResult;
 
+		if(file_res = 0) {
+			printf("no stat for %s, %s\n", filename, strerror(errno));
+		}
+		if(!file_res && !dump_res && file_stat.st_dev != dump_stat.st_dev){
+			// the files are on the same partition
+			printf("File stat: %ld\tDump Stat: %ld\n", file_stat.st_dev, dump_stat.st_dev);
+			int copyRes = copyfile(filename, dumpsterPath);
+			if(copyRes) {
+				printf("copy error, %s\n", strerror(errno));
+				return -1;
+			}
+			unlinkResult= unlink(filename);
+			if(unlinkResult) {
+				printf("Unlink error: %s\n", strerror(errno));
+				return -1;
+			}
+
+		} else {
+			linkResult = link(filename, dumpsterPath);
+			if(linkResult) {
+				printf("Link error: %s\n", strerror(errno));
+				return -1;
+			}
+			unlinkResult= unlink(filename);
+			if(unlinkResult) {
+				printf("Unlink error: %s\n", strerror(errno));
+				return -1;
+			}
+			printf("link/unlink results: %i\t%i\n", linkResult, unlinkResult);
+		}
+		free(dumpsterPath);
 		// TODO: return either link or unlink or combination of both
 		return 0;
 }
@@ -231,7 +300,6 @@ int removeAllFilesInList(int numfiles, char **filenames, const char force) {
 			removeFile(filenames[i]);
 		}
 	}
-
 	return 0;
 }
 
@@ -269,7 +337,9 @@ int main(int argc, char **argv) {
 
 			struct stat argStats;
 			int stat_res = stat(argv[i], &argStats);
-
+			if(stat_res) {
+				perror(strerror(errno));
+			}
 			// check if the arg is a filename
 			if(!stat_res && S_ISREG(argStats.st_mode)){
 				printf("Regular file: %s\n", argv[i]);
