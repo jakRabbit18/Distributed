@@ -18,6 +18,20 @@
 //			 does the above only force remove bar.c? Does it throw an error?
 
 
+// TESTS:
+//	- remove one file
+// 	- remove multiple files
+// 	- remove one directory
+// 	- remove multiple directories
+//  - remove multiple files/directories
+//	- remove one file with multiple hard links
+//	- remove multiple files with multiple hard links
+//  - remove multiple files/directories with multiple hardlinks
+//  - remove multiple files/directories across a disk with multiple hardlinks
+//  - can you have more than one hard link to a directory? 
+//		- if so, test removing one and multiple directories with multiple hardlinks
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +43,7 @@
 #include <limits.h>
 #include <ftw.h>
 #include <errno.h>
+#include <libgen.h>
 
 #define FALSE 0
 #define TRUE 1
@@ -47,15 +62,14 @@ struct Node
     struct Node *next;
 };
 
-int student_rm();
+char *dumpster;
+
+
 int copy_file();
 int copy_item(const char *fpath, const struct stat *sb, int tflag);
 int delete_dir(const char *fpath, const struct stat *sb, int tflag);
 char get_extension(const char*);
 
-int student_rm(){
-	return 0;
-}
 
 /* Function to add a node at the beginning of Linked List.
    This function expects a pointer to the data to be added
@@ -75,7 +89,7 @@ void push(struct Node** head_ref, void *new_data, size_t data_size)
         *(char *)(new_node->data + i) = *(char *)(new_data + i);
  
     // Change head pointer as new node is added at the beginning
-    (*head_ref)    = new_node;
+    (*head_ref) = new_node;
 }
 
 void delete_directories(struct Node *node){
@@ -119,6 +133,109 @@ int copy_item(const char *fpath, const struct stat *sb, int tflag){
 	return 0;
 }
 
+
+//return the number of files in the given directory
+int getNumFiles(const char *directory, char *filename) {
+	int numFiles = 0; // we don't already know if there's one of these files here
+	DIR *dir;
+	struct dirent *ent;
+	// try to open the dumster directory,
+	// this shouldn't be an issue by now, 
+	// but just to be sure...
+	if ((dir = opendir(directory))!=NULL) {
+		//now we can loop over all the files in the directory
+		while((ent = readdir(dir))!=NULL) {
+			//for each file, we can check if the base directory name is a substring of that file name (this covers saving .1's)
+			char name[strlen(ent->d_name)]; 
+			strcpy(name, ent->d_name);
+			
+			int strlength = strlen(name);
+			name[strlength-2] = '\0';
+			// char *res = strstr(ent->d_name, filename);
+
+			printf("Ent name: %s\n", ent->d_name);
+			if(strcmp(name, filename) == 0 || strcmp(ent->d_name, filename) == 0) {
+				// we've found another instance of this filename! increase our count
+				printf("file already exists %i times!\n", numFiles);
+				numFiles ++;
+			}
+		}
+	}
+
+	printf("Number of pre-exisitng files: %d\n", numFiles);
+	return numFiles;
+}
+
+int removeFile(char *filename) {
+		// this is the bit that actually moves the file  the dumpster
+		int dumpsterPathLength = strlen(dumpster);
+		dumpsterPathLength += strlen(filename) + 4; // to cover new null terminator, extra forward slash, possible num extension
+		printf("Dumpster path length: %i\n", dumpsterPathLength);
+		
+		// build the new string for the dumpster pathname
+		char *dumpsterPath = malloc(sizeof(char) * dumpsterPathLength);
+		sprintf(dumpsterPath, "%s/%s", dumpster, basename(filename));
+		// the following is based on a solution for reading dir from StackOverflow answer here:
+		// https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
+		
+		int numFiles = getNumFiles(dumpster, filename);
+		if(numFiles && numFiles < 10){
+			sprintf(dumpsterPath, "%s.%i", dumpsterPath, numFiles);
+		} else if (numFiles) {
+			// dumpster is full of this filename, print error and return
+			// TODO
+		}
+		printf("New Name: %s\n", dumpsterPath);
+
+		//now rename the file
+		// just renaming doesn't do anything if the deleted file is on a separate disk
+		// so we first add the new link, and then we delete the old link
+		// TODO: add check for disk change
+		struct stat file_stat;
+		struct stat dump_stat;
+		int file_res = stat(filename, &file_stat);
+		int dump_res = stat(dumpster, &dump_stat);
+		if(!file_res && !dump_res && file_stat.st_dev == dump_stat.st_dev){
+			// the files are on the same partition... I think?
+			printf("File stat: %ld\tDump Stat: %ld\n", file_stat.st_dev, dump_stat.st_dev);
+		}
+		int linkResult = link(filename, dumpsterPath);
+		if(linkResult) {
+			printf("Link error: %s\n", strerror(errno));
+			return -1;
+		}
+		int unlinkResult= unlink(filename);
+		if(unlinkResult) {
+			printf("Unlink error: %s\n", strerror(errno));
+		}
+		printf("link/unlink results: %i\t%i\n", linkResult, unlinkResult);
+		free(dumpsterPath);
+
+		// TODO: return either link or unlink or combination of both
+		return 0;
+}
+
+int removeAllFilesInList(int numfiles, char **filenames, const char force) {
+	// get rid of all the files in the given list
+	for(int i =0; i < numfiles; i ++){
+
+		printf("file: %s\n", filenames[i]);
+
+		// if force is on, just get rid of the file. Easy-peasy
+		if(force){
+			//here we punt to the og rm function
+			remove(filenames[i]);
+			continue;
+
+		} else {
+			removeFile(filenames[i]);
+		}
+	}
+
+	return 0;
+}
+
+
 int main(int argc, char **argv) {
 
 	char force = FALSE;
@@ -130,8 +247,10 @@ int main(int argc, char **argv) {
 	char **dirnames = malloc(sizeof(char *) * argc);  // use this array to accumulate the directories
 	int numfiles = 0;
 	int numDirs = 0;
+
 	for(int i = 0; i < argc; i++){
 		printf("argv[%d]: %s\n", i, argv[i]);
+
 		if(strcmp(argv[i], "-f") == 0){
 			force = TRUE;
 		}
@@ -149,16 +268,16 @@ int main(int argc, char **argv) {
 			// check rm'd file exists
 
 			struct stat argStats;
-			stat(argv[i], &argStats);
+			int stat_res = stat(argv[i], &argStats);
 
 			// check if the arg is a filename
-			if(S_ISREG(argStats.st_mode)){
+			if(!stat_res && S_ISREG(argStats.st_mode)){
 				printf("Regular file: %s\n", argv[i]);
 				filenames[numfiles++] = argv[i];
 			} 
 
 			//check if it is a directory
-			else if(S_ISDIR(argStats.st_mode)) {
+			else if(! stat_res && S_ISDIR(argStats.st_mode)) {
 				// for now we'll just keep track of the directories
 				// adding handling for them will come later. Probably a monday afternoon project
 				dirnames[numDirs++] = argv[i];
@@ -177,9 +296,11 @@ int main(int argc, char **argv) {
 		return 0;
 	}
 
-	const char *dumpster = getenv("DUMPSTER");
-
+	// we do this after we parse everything else, in case the help flag was used
+	// if no dumpster is declared, print an error and exit
+	dumpster = getenv("DUMPSTER");
 	if(dumpster == NULL){
+		perror("No dumpster declared\n");
 		return -1;
 	}
 
@@ -187,66 +308,11 @@ int main(int argc, char **argv) {
 	printf("Force: %i\nHelp: %i\nRecursive: %i\n", force, help, recursive);
 	printf("NumFiles: %i\n", numfiles);
 
-	
-	for(int i =0; i < numfiles; i ++){
+	// remove all the top level filenames
+	removeAllFilesInList(numfiles, filenames, force);
 
-		printf("file: %s\n", filenames[i]);
-
-		// if force is on, just get rid of the file. Easy-peasy
-		if(force){
-			//here we punt to the og rm function
-			remove(filenames[i]);
-			continue;
-		}
-
-		// thisis the bit that actually moves the file  the dumpster
-		int dumpsterPathLength = strlen(dumpster);
-		dumpsterPathLength += strlen(filenames[i]) + 4; // to cover new null terminator, extra forward slash, possible num extension
-		printf("Dumpster path length: %i\n", dumpsterPathLength);
-		
-		// build the new string for the dumpster pathname
-		char *dumpsterPath = malloc(sizeof(char) * dumpsterPathLength);
-		sprintf(dumpsterPath, "%s/%s", dumpster, filenames[i]);
-		printf("New Name: %s\n", dumpsterPath);
-
-		// the following is based on a solution for reading dir from StackOverflow answer here:
-		// https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
-		
-		int numFiles = 0; // we don't already know if there's one of these files here
-		DIR *dir;
-		struct dirent *ent;
-		// try to open the dumster directory,
-		// this shouldn't be an issue by now, 
-		// but just to be sure...
-		if ((dir = opendir(dumpster))!=NULL) {
-			//now we can loop over all the files in the directory
-			while((ent = readdir(dir))!=NULL) {
-				//for each file, we can check if the base dumpster name is a substring of that file name (this covers saving .1's)
-				char *res = strstr(ent->d_name, filenames[i]);
-				printf("Ent name: %s\n", ent->d_name);
-				if(res !=NULL) {
-					// we've found another instance of this filename! increase our count
-					printf("file already exists %i times!\n", numFiles);
-					numFiles ++;
-				}
-			}
-			if(numFiles){
-				sprintf(dumpsterPath, "%s.%i", dumpsterPath, numFiles);
-			}
-		}
-
-		//now rename the file
-		// just renaming doesn't do anything if the deleted file is on a separate disk
-		// so we first add the new link, and then we delete the old link
-		// TODO: add check for disk change
-		int linkResult = link(filenames[i], dumpsterPath);
-		int unlinkResult= unlink(filenames[i]);
-		printf("link/unlink results: %i\t%i\n", linkResult, unlinkResult);
-
-		free(dumpsterPath);
-		free(filenames);
-		free(dirnames);
-	}
+	free(filenames);
+	free(dirnames);
 
 
 }

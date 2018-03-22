@@ -8,5 +8,8 @@ rm: rm.c
 dv: dv.c
 	gcc dv.c -o dv
 
+DUMP: dump.c
+	gcc dump.c -o DUMP
+
 clean:
-	rm rm dv
+	rm -f -r rm dv test* DUMP
