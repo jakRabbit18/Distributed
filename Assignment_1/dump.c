@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <dirent.h>
+#include "utils.h"
 
 int countEntriesInDir(const char *dirname) {
 	int numEntries = 0;
@@ -87,9 +88,17 @@ int myDump(char *baseDir){
 		while((ent = readdir(dir)) != NULL) {
 			// here we loop over all the entries in the 
 			// directory and check if they're files/directories
+			printf("Current Entry: %s\n", ent->d_name);
+			int ext = checkFileExt(ent->d_name);
+			char *name = malloc(sizeof(char) * strlen(ent->d_name) + 1);
+			name = strcpy(name, ent->d_name);
+			if(ext) {
+				int len = strlen(name);
+				name[len-2] = '\0';
+			}
 			struct stat entStat;
-			int res = stat(ent->d_name, &entStat);
-			printf("Current entry: %s\n", ent->d_name);
+			int res = stat(name, &entStat);
+			printf("checked for ext: %s\n", name);
 			if(res != 0) {
 				printf("stat result: %d:", res);
 				printf("%s\n", strerror(errno));
@@ -115,6 +124,8 @@ int myDump(char *baseDir){
 					rmdir(name);
 				}
 			}
+
+			free(name);
 		}
 	}
 

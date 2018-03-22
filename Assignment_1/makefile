@@ -2,14 +2,17 @@
 
 all: rm
 	
-rm: rm.c
-	gcc rm.c -o rm
+rm: rm.c utils.o
+	gcc rm.c utils.o -o rm
 
 dv: dv.c
 	gcc dv.c -o dv
 
-DUMP: dump.c
-	gcc dump.c -o DUMP
+DUMP: dump.c utils.o
+	gcc dump.c utils.o -o DUMP
+
+utils.o: utils.c utils.h
+	gcc utils.c -c -o utils.o
 
 clean:
-	rm -f -r rm dv test* DUMP
+	rm -f -r rm dv utils.o test* DUMP
