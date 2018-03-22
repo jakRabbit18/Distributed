@@ -15,4 +15,4 @@ utils.o: utils.c utils.h
 	gcc utils.c -c -o utils.o
 
 clean:
-	rm -f -r rm dv utils.o test* DUMP
+	rm -f -r rm dv utils.o mytest* DUMP

@@ -64,68 +64,93 @@ int removeFile(char *file) {
 
 int myDump(char *baseDir){
 	printf("removing files from %s\n", baseDir);
-	// for every file in filenames
-	// if it is a file remove it
-	// if it is a directory:
-	// 		obtain a list of the files in the directory
-	// 		pass this list to myDump and collect the result
-	//		if the result is success, continue
-	// 		if the result was failure, return failure
-	// if we finish the loop, we successfully removed everything (I hope)
 
-	// then we need to obtain a list of the top level items in the dumpster
-
-	char **collecteddirs;
-	int numEntries = countDirsInDir(baseDir);
-
-	collecteddirs = malloc(sizeof(char *) *numEntries);
-
-	int numDirs = 0;
 	DIR *dir;
 	struct dirent *ent;
+
 	// try to open the dumpster
 	if((dir = opendir(baseDir))!=NULL) {
 		while((ent = readdir(dir)) != NULL) {
 			// here we loop over all the entries in the 
 			// directory and check if they're files/directories
-			printf("Current Entry: %s\n", ent->d_name);
+
+			// make the filename friendly for playing with stat
 			int ext = checkFileExt(ent->d_name);
 			char *name = malloc((sizeof(char) * strlen(ent->d_name)) + (sizeof(char) * strlen(baseDir)) + 1);
-			printf("full name: %s\n", name);
 			sprintf(name, "%s/%s", baseDir, ent->d_name);
+			// printf("full name: %s\n", name);
 			if(ext) {
 				int len = strlen(name);
 				name[len-2] = '\0';
 			}
-			printf("checked for ext: %s\n", name);
+			// printf("checked for ext: %s\n", name);
 			struct stat entStat;
 			int res = stat(name, &entStat);
 			if(res != 0) {
-				printf("stat result: %d:", res);
 				printf("%s\n", strerror(errno));
 			}
 
 			// Get rid of this entry if it is a file
 			if(S_ISREG(entStat.st_mode)){
-				printf("Attempt to remove %s\n", name);
 				int res = removeFile(name);
-				printf("Remove %s result: %d\n", name, res);
+				// printf("Remove %s result: %d\n", name, res);
 			}
 
-			// Call myDump on this if it is a directory. Once it returns, delete it
+			// call mydump on the entry if it is a directory
 			else if(S_ISDIR(entStat.st_mode)) {
 				printf("Directory name: %s\n", name);
-				collecteddirs[numDirs] = name;
-				if(strcmp(ent->d_name, "..") != 0 && strcmp(ent->d_name, ".") != 0){
-					printf("deleting...\n");
-					int success_delete = myDump(name);
+				if(strcmp(ent->d_name, "..") != 0 && strcmp(ent->d_name, ".") != 0) {
+					int delete_error = myDump(name);
+					if(delete_error) {
+						return delete_error;
+					}
+					printf("deleting %s\n", name);
 					// rmdir(name);
 				}
 			}
-
+			// free(name);
 			free(name);
 		}
+		// closedir(dir);
 	}
+	// closedir(dir);
+
+	// if((dir = opendir(baseDir))!=NULL) {
+	// 	while((ent = readdir(dir)) != NULL) {
+	// 		// here we loop over all the entries in the 
+	// 		// directory and check if they're files/directories
+	// 		printf("Current Entry: %s\n", ent->d_name);
+
+	// 		// make the filename friendly for playing with stat
+	// 		int ext = checkFileExt(ent->d_name);
+	// 		char *name = malloc((sizeof(char) * strlen(ent->d_name)) + (sizeof(char) * strlen(baseDir)) + 1);
+	// 		sprintf(name, "%s/%s", baseDir, ent->d_name);
+	// 		printf("full name: %s\n", name);
+	// 		if(ext) {
+	// 			int len = strlen(name);
+	// 			name[len-2] = '\0';
+	// 		}
+
+	// 		printf("checked for ext: %s\n", name);
+	// 		struct stat entStat;
+	// 		int res = stat(name, &entStat);
+
+	// 		if(res != 0) {
+	// 			printf("stat result: %d:", res);
+	// 			printf("%s\n", strerror(errno));
+	// 		}
+
+	// 		if(S_ISDIR(entStat.st_mode)) {
+	// 			printf("Directory name: %s\n", name);
+	// 			if(strcmp(ent->d_name, "..") != 0 && strcmp(ent->d_name, ".") != 0) {
+	// 				printf("deleting...\n");
+	// 				int success_delete = myDump(name);
+	// 				rmdir(name);
+	// 			}
+	// 		}
+	// 		free(name);
+	// 	}
+	// }
 
 	return 0;
 	
