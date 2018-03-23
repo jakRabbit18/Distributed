@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <libgen.h>
 #include <assert.h>
+#include "utils.h"
 
 #define FALSE 0
 #define TRUE 1
@@ -21,9 +22,6 @@
  * ./dv file exists.txt -> error
  * ./dv mydir
  * ./dv mydir/sub/sub2
- * 
- *
- *
  */
 
 //list which will hold paths of directories for later deletion
@@ -45,8 +43,7 @@ int result = 0;
 /* Function to add a node at the beginning of Linked List.
    This function expects a pointer to the data to be added
    and size of the data type */
-void push(struct Node** head_ref, void *new_data, size_t data_size)
-{
+void push(struct Node** head_ref, void *new_data, size_t data_size) {
     // Allocate memory for node
     struct Node* new_node = (struct Node*)malloc(sizeof(struct Node));
  
@@ -63,8 +60,7 @@ void push(struct Node** head_ref, void *new_data, size_t data_size)
     (*head_ref)    = new_node;
 }
 
-void chopN(char *str, size_t n)
-{
+void chopN(char *str, size_t n) {
     assert(n != 0 && str != 0);
     size_t len = strlen(str);
     if (n > len)
@@ -111,6 +107,7 @@ void delete_directories(struct Node *node){
 int copy_directory(const char *fpath, const struct stat *sb, int tflag){
 	result = 0;
 	printf("path: %s\n", fpath);
+	// this wall of text builds the path to which we need to restore the file/directory
 	char buffer[256];
 	const char *cwd = getcwd(buffer, sizeof(buffer));
 	printf("string to match: %s\n", str_to_match);
@@ -131,21 +128,35 @@ int copy_directory(const char *fpath, const struct stat *sb, int tflag){
 			push(&start, (void*)fpath, sizeof(char) * strlen(fpath) + 4);
 		}
 	}
+
 	//if we are walking over a file, unlink it then link it to dumpster path
-	else if(tflag == FTW_F){
+	else if(tflag == FTW_F) {
 		int result;
-		if(!(access(refreshPath, F_OK) != -1)){
-			result = rename(fpath, refreshPath);
+		if(!(access(refreshPath, F_OK) != -1)) {
+			char *cwd = get_current_dir_name();
+			struct stat fstat;
+			struct stat cwdstat;
+			int fres = stat(fpath, &fstat);
+			int cwdres = stat(cwd, &fstat);
+			if(!fres && !cwdres && fstat.st_dev != cwdstat.st_dev) {
+				// dest is a separate disk
+				result = copyfile(fpath, refreshPath);
+				unlink(fpath);
+			} else {
+				result = rename(fpath, refreshPath);
+			}
+			free(cwd);
 		}
 		printf("rename result: %d\n", result);
 	}
+	free(refreshPath);
 	return 0;
 }
 
 
-int restore_files_walk(char** filenames, int numfiles){
+int restore_files_walk(char** filenames, int numfiles) {
 	printf("numfiles: %d\n", numfiles);
-	for(int i =0; i < numfiles; i ++){
+	for(int i =0; i < numfiles; i ++) {
 		result = 0;
 		printf("file: %s\n", filenames[i]);
 
@@ -157,8 +168,8 @@ int restore_files_walk(char** filenames, int numfiles){
 
 		ftw(dumpster, match_string, 1);
 		printf("d_path before copy: %s\n", d_path);
-		if(result == 1){
-			//now rename the file
+		if(result == 1) {
+			// now rename the file
 			// just renaming doesn't do anything if the deleted file is on a separate disk
 			// so we first add the new link, and then we delete the old link
 			// TODO: add check for disk change
@@ -175,19 +186,32 @@ int restore_files_walk(char** filenames, int numfiles){
 			//sprintf(dumpsterPath, "%s/%s", dumpster, d_path);
 			//printf("New Name: %s\n", dumpsterPath);
 			printf("d_path: %s\n", d_path);
-			int linkResult = link(d_path, refreshPath);
-			int unlinkResult= unlink(d_path);
+			// char *cwd = get_current_dir_name();
+			struct stat fstat;
+			struct stat cwdstat;
+			int fres = stat(d_path, &fstat);
+			int cwdres = stat(cwd, &fstat);
+			int linkResult, unlinkResult;
+			if(!fres && !cwdres && fstat.st_dev != cwdstat.st_dev) {
+				// dest is a separate disk
+				int linkResult = copyfile(d_path, refreshPath);
+				unlink(d_path);
+			} else {
+				// result = rename(fpath, refreshPath);
+				link(d_path, refreshPath);
+				unlink(d_path);
+			}
+			// free(cwd);
 			printf("link/unlink results: %i\t%i\n", linkResult, unlinkResult);
 
 			//free(dumpsterPath);
 			//free(filenames);		
 		}
-		else{
+		else {
 			//could not find the file
 			printf("file does not exist in dumpster: %s\n", filenames[i]);
 			return -1;
 		}
-
 	}
 }
 
@@ -205,7 +229,7 @@ int restore_directory(char* name){
 	printf("d_path before copy: %s\n", d_path);
 	if(result == 1){
 		ftw(d_path, copy_directory, 1);
-		//delete_directories(start);
+		delete_directories(start);
 	}
 	else{
 		//could not find the file

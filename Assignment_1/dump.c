@@ -63,7 +63,7 @@ int removeFile(char *file) {
 }
 
 int myDump(char *baseDir){
-	printf("removing files from %s\n", baseDir);
+	// printf("removing files from %s\n", baseDir);
 
 	DIR *dir;
 	struct dirent *ent;
@@ -80,15 +80,15 @@ int myDump(char *baseDir){
 			char name[strlen(ent->d_name) + strlen(baseDir) + 2];
 			sprintf(name, "%s/%s", baseDir, ent->d_name);
 			// printf("full name: %s\n", name);
-			if(ext) {
-				int len = strlen(name);
-				name[len-2] = '\0';
-			}
+			// if(ext) {
+			// 	int len = strlen(name);
+			// 	name[len-2] = '\0';
+			// }
 			// printf("checked for ext: %s\n", name);
 			struct stat entStat;
 			int res = stat(name, &entStat);
 			if(res != 0) {
-				printf("%s\n", strerror(errno));
+				printf("%s: %s\n", name, strerror(errno));
 			}
 
 			// Get rid of this entry if it is a file
@@ -99,58 +99,18 @@ int myDump(char *baseDir){
 
 			// call mydump on the entry if it is a directory
 			else if(S_ISDIR(entStat.st_mode)) {
-				printf("Directory name: %s\n", name);
+				// printf("Directory name: %s\n", name);
 				if(strcmp(ent->d_name, "..") != 0 && strcmp(ent->d_name, ".") != 0) {
 					int delete_error = myDump(name);
 					if(delete_error) {
 						return delete_error;
 					}
-					printf("deleting %s\n", name);
+					// printf("deleting %s\n", name);
 					rmdir(name);
 				}
 			}
-			// free(name);
 		}
-		// closedir(dir);
 	}
-
-	// if((dir = opendir(baseDir))!=NULL) {
-	// 	while((ent = readdir(dir)) != NULL) {
-	// 		// here we loop over all the entries in the 
-	// 		// directory and check if they're files/directories
-	// 		printf("Current Entry: %s\n", ent->d_name);
-
-	// 		// make the filename friendly for playing with stat
-	// 		int ext = checkFileExt(ent->d_name);
-	// 		char *name = malloc((sizeof(char) * strlen(ent->d_name)) + (sizeof(char) * strlen(baseDir)) + 1);
-	// 		sprintf(name, "%s/%s", baseDir, ent->d_name);
-	// 		printf("full name: %s\n", name);
-	// 		if(ext) {
-	// 			int len = strlen(name);
-	// 			name[len-2] = '\0';
-	// 		}
-
-	// 		printf("checked for ext: %s\n", name);
-	// 		struct stat entStat;
-	// 		int res = stat(name, &entStat);
-
-	// 		if(res != 0) {
-	// 			printf("stat result: %d:", res);
-	// 			printf("%s\n", strerror(errno));
-	// 		}
-
-	// 		if(S_ISDIR(entStat.st_mode)) {
-	// 			printf("Directory name: %s\n", name);
-	// 			if(strcmp(ent->d_name, "..") != 0 && strcmp(ent->d_name, ".") != 0) {
-	// 				printf("deleting...\n");
-	// 				int success_delete = myDump(name);
-	// 				rmdir(name);
-	// 			}
-	// 		}
-	// 		free(name);
-	// 	}
-	// }
-
 	return 0;
 	
 }
@@ -159,11 +119,11 @@ int main(int argc, char ** argv){
 
 	// first we need to find the dumpster
 	char *dumpster = getenv("DUMPSTER");
-	printf("Dumpster path: %s\n", dumpster);
+	// printf("Dumpster path: %s\n", dumpster);
 
 	// then we kick off the deletion of everything
 	int res = myDump(dumpster);
 
-	return 0;
+	return res;
 
 }

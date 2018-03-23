@@ -20,5 +20,5 @@
 // extern char *dumpster;
 int getNumFiles(const char *directory, char *filename);
 int checkFileExt(const char *filename);
-
+int copyfile(char *source, char *dest);
 #endif /*!UTILS H*/

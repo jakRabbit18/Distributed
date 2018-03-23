@@ -95,7 +95,7 @@ void push(struct Node** head_ref, void *new_data, size_t data_size)
 void delete_directories(struct Node *node){
 	while(node != NULL){
 		rmdir((char*)node->data);
-		printf("node path: %s\n", (char*)node->data);
+		// printf("node path: %s\n", (char*)node->data);
 		node = node->next;
 	}
 }
@@ -103,20 +103,20 @@ void delete_directories(struct Node *node){
 // with reference from:
 // https://stackoverflow.com/questions/2256945/removing-a-non-empty-directory-programmatically-in-c-or-c
 int copy_item(const char *fpath, const struct stat *sb, int tflag){
-	printf("path: %s\n", fpath);
+	// printf("path: %s\n", fpath);
 	const char *dumpster = getenv("DUMPSTER");
 	
 	int dumpsterPathLength = strlen(dumpster);
 	dumpsterPathLength += strlen(fpath) + 4; // to cover new null terminator, extra forward slash, possible num extension
-	printf("Dumpster path length: %i\n", dumpsterPathLength);
+	// printf("Dumpster path length: %i\n", dumpsterPathLength);
 	
 	// build the new string for the dumpster pathname
 	char *dumpsterPath = malloc(sizeof(char) * dumpsterPathLength);
 	sprintf(dumpsterPath, "%s/%s", dumpster, fpath);
-	printf("New Name: %s\n", dumpsterPath);
+	// printf("New Name: %s\n", dumpsterPath);
 	//if we are walking over a directory, create a new empty dir under the dumpster
 	if(tflag == FTW_D){
-		printf("this is a directory\n");
+		// printf("this is a directory\n");
 		struct stat st = {0};
 		if(stat(dumpsterPath, &st) == -1){
 			mkdir(dumpsterPath, 0700);
@@ -129,57 +129,9 @@ int copy_item(const char *fpath, const struct stat *sb, int tflag){
 		if(!(access(dumpsterPath, F_OK) != -1)){
 			result = rename(fpath, dumpsterPath);
 		}
-		printf("rename result: %d\n", result);
+		// printf("rename result: %d\n", result);
 	}
 	return 0;
-}
-
-// copies a given file from source to dest
-int copyfile(char *source, char *dest) {
-	FILE *srcf, *destf;
-	int c;
-	srcf = fopen(source, "r");
-	destf = fopen(dest, "w");
-	if(!srcf) {
-		printf("Couldn't open the file %s to copy it to the dumpster\n", source);
-		return -1;
-	}
-	if(!destf) {
-		printf("Couldn't open the file %s to recieve the copy\n", dest);
-		return -1;
-	}
-
-	if(destf && srcf) {
-		while((c = getc(srcf))!= EOF) {
-			putc(c, destf);
-		}
-
-		// set dest permissions to match source 
-		struct stat src_stat;
-		struct stat dest_stat;
-		int src_res = stat(source, &src_stat);
-		int dest_res = stat(dest, &dest_stat);
-
-		if(!src_res && !dest_res) {
-			dest_res = chmod(dest, src_stat.st_mode);
-		} else {
-			printf("Stat ran into an issue, %s\n", strerror(errno));
-			return -1;
-		}
-
-		// do the same with access times
-		struct utimbuf dest_times;
-		dest_times.actime = src_stat.st_atime;
-		dest_times.modtime = src_stat.st_mtime;
-		utime(dest, &dest_times);
-
-		// a little clean-up
-		fclose(destf);
-		fclose(srcf);
-		return 0;
-	}
-	printf("something else went wrong I guess\n");
-	return -1;
 }
 
 // the following is based on a solution for reading dir from StackOverflow answer here:
@@ -188,7 +140,7 @@ int removeFile(char *filename) {
 	// this is the bit that actually moves the file  the dumpster
 	int dumpsterPathLength = strlen(dumpster);
 	dumpsterPathLength += strlen(filename) + 4; // to cover new null terminator, extra forward slash, possible num extension
-	printf("Dumpster path length: %i\n", dumpsterPathLength);
+	// printf("Dumpster path length: %i\n", dumpsterPathLength);
 	
 	// build the new string for the dumpster pathname
 	char *dumpsterPath = malloc(sizeof(char) * dumpsterPathLength);
@@ -207,7 +159,7 @@ int removeFile(char *filename) {
 	
 	// if the extension was valid, we in business
 	if(ext) {
-		printf("we found a digit\n");
+		// printf("we found a digit\n");
 		// the end of the file was in fact a .num (we assume) so strip the extension
 		numFiles ++;
 		int len = strlen(dumpsterPath);
@@ -221,7 +173,7 @@ int removeFile(char *filename) {
 		printf("Dumpser full of %s\n", filename);
 	}
 
-	printf("New Name: %s\n", dumpsterPath);
+	// printf("New Name: %s\n", dumpsterPath);
 
 	// now rename the file
 	// just renaming doesn't do anything if the deleted file is on a separate disk
@@ -232,7 +184,7 @@ int removeFile(char *filename) {
 	int dump_res = stat(dumpster, &dump_stat);
 	int linkResult, unlinkResult;
 
-	if(file_res == 0) {
+	if(file_res != 0) {
 		printf("no stat for %s, %s\n", filename, strerror(errno));
 	}
 	if(!file_res && !dump_res && file_stat.st_dev != dump_stat.st_dev){
@@ -269,7 +221,7 @@ int removeAllFilesInList(int numfiles, char **filenames, const char force) {
 	// get rid of all the files in the given list
 	for(int i =0; i < numfiles; i ++){
 
-		printf("file: %s\n", filenames[i]);
+		// printf("file: %s\n", filenames[i]);
 
 		// if force is on, just get rid of the file. Easy-peasy
 		if(force){
@@ -319,16 +271,15 @@ int main(int argc, char **argv) {
 		else if(i > 0) {
 			// check if the name is a filename, a directory, or nonexistent
 			// check rm'd file exists
-
 			struct stat argStats;
 			int stat_res = stat(argv[i], &argStats);
 			if(stat_res) {
-				perror(strerror(errno));
+				printf("%s: %s\n", argv[i], strerror(errno));
 				continue;
 			}
 			// check if the arg is a filename
 			if(!stat_res && S_ISREG(argStats.st_mode)){
-				printf("Regular file: %s\n", argv[i]);
+				// printf("Regular file: %s\n", argv[i]);
 				filenames[numfiles++] = argv[i];
 			} 
 
@@ -337,12 +288,7 @@ int main(int argc, char **argv) {
 				// for now we'll just keep track of the directories
 				// adding handling for them will come later. Probably a monday afternoon project
 				dirnames[numDirs++] = argv[i];
-				printf("dir: %s\n", argv[i]);
-				ftw(argv[i], copy_item, 1);
-				//delete remaining empty directories by referencing LL
-				delete_directories(start);
 			}
-
 			//TODO: add error message if the pathname is neither a valid file or directory
 		}
 	}
@@ -362,7 +308,11 @@ int main(int argc, char **argv) {
 
 	// remove all the top level filenames
 	removeAllFilesInList(numfiles, filenames, force);
-
+	for(int i = 0; i < numDirs; i++){
+		// printf("dir: %s\n", dirnames[i]);
+		ftw(dirnames[i], copy_item, 1);
+		delete_directories(start);
+	}
 	free(filenames);
 	free(dirnames);
 

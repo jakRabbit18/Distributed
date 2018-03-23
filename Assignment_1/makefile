@@ -5,8 +5,8 @@ all: rm
 rm: rm.c utils.o
 	gcc rm.c utils.o -o rm
 
-dv: dv.c
-	gcc dv.c -o dv
+dv: dv.c utils.o
+	gcc dv.c utils.o -o dv
 
 DUMP: dump.c utils.o
 	gcc dump.c utils.o -o DUMP
