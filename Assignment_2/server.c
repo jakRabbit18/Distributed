@@ -48,9 +48,55 @@ things we need for a server
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
+
 
 
 #define BUFFSIZE 1024
+
+struct Node{
+    // Any data type can be stored in this node
+    pid_t  *pid;
+    struct Node *next;
+};
+
+/* Function to add a node at the beginning of Linked List. */
+void push(struct Node* head_ref, pid_t new_data) {
+    // Allocate memory for node
+    struct Node* new_node = (struct Node*)malloc(sizeof(struct Node));
+ 	
+ 	printf("adding pid: %ld\n", (long) new_data);
+    *(new_node->pid) = new_data;
+    new_node->next = head_ref;
+ 
+    // Change head pointer as new node is added at the beginning
+    head_ref = new_node;
+}
+
+/* function to remove a node from the list */
+int delete_node(struct Node *head, pid_t pid){
+	if(head->next == NULL) {
+		// if we've reached the end of the list
+		// the node is not in here... odd. return error
+		perror("Error: given node is not present in the list.\n");
+		return -1;
+	}
+
+	if(*(head->pid) == pid) {
+		// we found it! 
+		// connect the node after the target node to the current head
+		// then get rid of the target node
+		struct Node *n = head->next;
+		head->next = n->next;
+		free(n);
+		return 0;
+	}
+
+	// we still have some list left and we haven't found the node
+	// keep looking!
+	return delete_node(head->next, pid);
+}
+
 int main(int argc, char **argv) {
 	// this is the main function where the main stuff happens
 	int lfd = 0, cfd = 0;
@@ -78,29 +124,60 @@ int main(int argc, char **argv) {
 	// wait for a client to connect
 	// TODO: add timeouts
 	char connect = 0;
-
-	// we have a connection! now we can start up the shell
 	int read_res; 
-	while(1) {
-		while(!cfd) {
-			cfd = accept(lfd, (struct sockaddr*) NULL, NULL);
-		}
-		printf("Connected!\n");
-		// printf("%s\n", readBuffer);
-		while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0){
-			readBuffer[read_res] = '\0';
-			printf("%s, %ld, %d\n", readBuffer, strlen(readBuffer), read_res);
-			memset(readBuffer, '\0', sizeof(readBuffer));
-		}
+	char exit = 0;
+	struct Node *pid_head = NULL;
+	int status;
+	while(!exit) {
+		cfd = accept(lfd, (struct sockaddr*) NULL, NULL);
+		// we have a connected client! now fork to handle their requests
+		// and to keep accepting more. More clients more money, more problems
+		pid_t pid = fork();
+		if(pid != 0) {
+			// this is the parent, hang around and wait for the child to return
+			// while also waiting for more clients
+			printf("Parent: %ld\n", (long) pid);
+			push(pid_head, pid);
+			pid_t child = waitpid(-1, &status, WNOHANG);
+			if(child) {
+				// a child has returned! remove it from the list
+				delete_node(pid_head, child);
+			}
 
-		close(cfd);
-		cfd = 0;
-		memset(readBuffer, '\0', sizeof(readBuffer));
-		
+
+		} else {
+			// this is the child process, where all the magic happens
+			printf("Connected!\n");
+			pid_t me = getpid();
+			printf("Child pid: %ld\n", (long) me);
+			// read whatever is sent from the client in batches of BUFFSIZE
+			while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0){
+				readBuffer[read_res] = '\0';
+				printf("%s, %ld, %d\n", readBuffer, strlen(readBuffer), read_res);
+				if(strcmp(readBuffer, "exit") == 0) {
+					exit = 1;
+					break;
+				}
+				memset(readBuffer, '\0', sizeof(readBuffer));
+
+			}
+
+			//clean up at the end
+			close(cfd);
+			cfd = 0;
+			memset(readBuffer, '\0', sizeof(readBuffer));
+			printf("ending child process %ld...\n", (long) me);
+		}
 	}
 
 	if(read_res < 0) {
 		printf("read error\n");
+	}
+
+	while(pid_head != NULL){
+		pid_t child = wait(0);
+		// a child has returned! remove it from the list
+		delete_node(pid_head, child);
 	}
 
 	close(cfd);
