@@ -56,45 +56,61 @@ things we need for a server
 
 struct Node{
     // Any data type can be stored in this node
-    pid_t  *pid;
+    pid_t  pid;
     struct Node *next;
 };
 
 /* Function to add a node at the beginning of Linked List. */
-void push(struct Node* head_ref, pid_t new_data) {
+struct Node * push(struct Node* head_ref, pid_t new_data) {
     // Allocate memory for node
-    struct Node* new_node = (struct Node*)malloc(sizeof(struct Node));
+    struct Node* new_node = (struct Node*) malloc(sizeof(struct Node));
  	
  	printf("adding pid: %ld\n", (long) new_data);
-    *(new_node->pid) = new_data;
+    new_node->pid = new_data;
+    printf("updating head ref\n");
     new_node->next = head_ref;
- 
     // Change head pointer as new node is added at the beginning
+    printf("updating head ref to be new node\n");
     head_ref = new_node;
+    return new_node;
 }
 
 /* function to remove a node from the list */
-int delete_node(struct Node *head, pid_t pid){
-	if(head->next == NULL) {
-		// if we've reached the end of the list
-		// the node is not in here... odd. return error
-		perror("Error: given node is not present in the list.\n");
-		return -1;
+struct Node *delete_node(struct Node *head, pid_t pid){
+	printf("deleteing pid %d\n", pid);
+	struct Node *n;
+	// if there's no head, there's no pid in the list
+	// if there is a head and there's no next node, 
+	// 	check the pid, if it doesn't match, the pid isn't in the list
+	// ===== end the "just a head" case =====
+	// there is now definitely a head and a next node
+	// if the next node's pid matches,
+	// 	set head->next to next->next
+	// 	free n
+	// if none of that matched, call it on the next node
+	if(head == NULL) {
+		printf("No pids in the list\n");
+		return NULL;
 	}
 
-	if(*(head->pid) == pid) {
-		// we found it! 
-		// connect the node after the target node to the current head
-		// then get rid of the target node
-		struct Node *n = head->next;
+	// handles the case that the pid is the only one in the list
+	if(head->next == NULL) {
+		if(head->pid == pid) {
+			free(head);
+			return NULL;
+		}
+	}
+
+	n = head->next;
+	if(n->pid == pid){
+		//the next node contains the pid
 		head->next = n->next;
 		free(n);
-		return 0;
+		return head;
 	}
 
-	// we still have some list left and we haven't found the node
-	// keep looking!
-	return delete_node(head->next, pid);
+	//still looking for the pid
+	return delete_node(n, pid);
 }
 
 int main(int argc, char **argv) {
@@ -128,20 +144,27 @@ int main(int argc, char **argv) {
 	char exit = 0;
 	struct Node *pid_head = NULL;
 	int status;
+	pid_t pid;
 	while(!exit) {
 		cfd = accept(lfd, (struct sockaddr*) NULL, NULL);
 		// we have a connected client! now fork to handle their requests
 		// and to keep accepting more. More clients more money, more problems
-		pid_t pid = fork();
+		pid = fork();
 		if(pid != 0) {
 			// this is the parent, hang around and wait for the child to return
 			// while also waiting for more clients
 			printf("Parent: %ld\n", (long) pid);
-			push(pid_head, pid);
+			pid_head = push(pid_head, pid);
+
 			pid_t child = waitpid(-1, &status, WNOHANG);
-			if(child) {
+			printf("child returned: %ld\n", (long) child);
+			if(child > 0) {
 				// a child has returned! remove it from the list
 				delete_node(pid_head, child);
+			}
+
+			if(pid_head == NULL) {
+				exit = 1;
 			}
 
 
@@ -155,18 +178,17 @@ int main(int argc, char **argv) {
 				readBuffer[read_res] = '\0';
 				printf("%s, %ld, %d\n", readBuffer, strlen(readBuffer), read_res);
 				if(strcmp(readBuffer, "exit") == 0) {
-					exit = 1;
 					break;
 				}
 				memset(readBuffer, '\0', sizeof(readBuffer));
 
 			}
-
 			//clean up at the end
 			close(cfd);
 			cfd = 0;
 			memset(readBuffer, '\0', sizeof(readBuffer));
 			printf("ending child process %ld...\n", (long) me);
+			break;
 		}
 	}
 
@@ -174,12 +196,15 @@ int main(int argc, char **argv) {
 		printf("read error\n");
 	}
 
-	while(pid_head != NULL){
+
+	while(pid_head != NULL && pid != 0){
+		printf("waiting for children of %ld to finish\n", (long) getpid());
 		pid_t child = wait(0);
 		// a child has returned! remove it from the list
 		delete_node(pid_head, child);
 	}
 
 	close(cfd);
+	printf("PID %d ended successfully\n", getpid());
 	return 0;
 }

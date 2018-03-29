@@ -4,6 +4,6 @@ Assignment_1/dv
 Assignment_1/DUMP
 Assignment_1/mytest*
 */*.o
-Assignment_1/makefile
+*/makefile
 
 
