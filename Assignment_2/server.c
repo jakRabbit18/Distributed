@@ -215,9 +215,11 @@ int main(int argc, char **argv) {
 			printf("close lfd\n");
 			// pipe output to the socket
 			dup2(cfd, STDOUT_FILENO);
-			whie((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0) {
+			/*
+			while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0) {
 				
 			}
+			*/
 
 			// printf("Closed lfd, ran dup2\n");
 			// read whatever is sent from the client in batches of BUFFSIZE

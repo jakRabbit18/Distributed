@@ -68,13 +68,40 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
+	//read and send username
+	char x;
+	int idx = 0;
+	int buff_idx = 0;
+	char uname[50];
+	while((x = getchar()) != '\n') {
+		uname[idx++] = x;
+		sendBuffer[buff_idx++] = x;
+		if(idx == 49){
+			uname[idx] = '\0';
+			sendBuffer[buff_idx] = '\0';
+			// printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
+			printf("uname: %s\n", uname);
+			write(sfd, sendBuffer, strlen(sendBuffer));
+			buff_idx = 0;
+			memset(sendBuffer,'\0', sizeof(sendBuffer));
+		}
+	}
+	sendBuffer[buff_idx] = '\0';
+	uname[idx] = '\0';
+	// printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
+	printf("uname: %s\n", uname);
+	write(sfd, sendBuffer, strlen(sendBuffer));
+	buff_idx = 0;
+	memset(sendBuffer, '\0', sizeof(sendBuffer));
+
+    //read and send command
 	char c;
-	int buff_idx =0;
+	buff_idx =0;
 	while((c = getchar()) != '\n') {
 		sendBuffer[buff_idx++] = c;
 		if(buff_idx == BUFFSIZE-1){
 			sendBuffer[buff_idx] = '\0';
-			// printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
+			//printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
 			write(sfd, sendBuffer, strlen(sendBuffer));
 			buff_idx = 0;
 			memset(sendBuffer,'\0', sizeof(sendBuffer));
