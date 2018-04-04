@@ -88,12 +88,12 @@ int main(int argc, char **argv) {
 		memset(sendBuffer, '\0', sizeof(sendBuffer));
 	}
 	// this bit reads the socket for the response from the server
-	// while((read_loc = read(sfd, recieveBuffer, sizeof(recieveBuffer)-1)) > 0) {
-	// 	recieveBuffer[read_loc] = 0;
-	// 	if(fputs(recieveBuffer, stdout) == EOF) {
-	// 		printf("\nError: fputs is bad\n");
-	// 	}
-	// }
+	while((read_loc = read(sfd, recieveBuffer, sizeof(recieveBuffer)-1)) > 0) {
+		recieveBuffer[read_loc] = 0;
+		if(fputs(recieveBuffer, stdout) == EOF) {
+			printf("\nError: fputs is bad\n");
+		}
+	}
 
 	if(read_loc < 0) {
 		printf("\nError: reading error\n");

@@ -63,6 +63,7 @@ struct Node{
 /* Function to add a node at the beginning of Linked List. */
 struct Node * push(struct Node* head_ref, pid_t new_data) {
     // Allocate memory for node
+    printf("Pushing new data %ld\n", (long) new_data);
     struct Node* new_node = (struct Node*) malloc(sizeof(struct Node));
  	
  	printf("adding pid: %ld\n", (long) new_data);
@@ -167,16 +168,28 @@ int main(int argc, char **argv) {
 				exit = 1;
 			}
 
+			// close the accepted socket here
+			close(cfd);
+			cfd = 0;
 
 		} else {
 			// this is the child process, where all the magic happens
 			printf("Connected!\n");
 			pid_t me = getpid();
 			printf("Child pid: %ld\n", (long) me);
+
+			// close the listening socket
+			close(lfd);
+			printf("close lfd\n");
+			// pipe output to the socket
+			// dup2(cfd, STDOUT_FILENO);
+
+			printf("Closed lfd, ran dup2\n");
 			// read whatever is sent from the client in batches of BUFFSIZE
 			while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0){
 				readBuffer[read_res] = '\0';
 				printf("%s, %ld, %d\n", readBuffer, strlen(readBuffer), read_res);
+				write(cfd, readBuffer, strlen(readBuffer));
 				if(strcmp(readBuffer, "exit") == 0) {
 					break;
 				}
