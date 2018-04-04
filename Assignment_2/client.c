@@ -70,25 +70,24 @@ int main(int argc, char **argv) {
 
 	char c;
 	int buff_idx =0;
-	while(1) {
-		while((c = getchar()) != '\n') {
-			sendBuffer[buff_idx++] = c;
-			if(buff_idx == BUFFSIZE-1){
-				sendBuffer[buff_idx] = '\0';
-				// printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
-				write(sfd, sendBuffer, strlen(sendBuffer));
-				buff_idx = 0;
-				memset(sendBuffer,'\0', sizeof(sendBuffer));
-			}
+	while((c = getchar()) != '\n') {
+		sendBuffer[buff_idx++] = c;
+		if(buff_idx == BUFFSIZE-1){
+			sendBuffer[buff_idx] = '\0';
+			// printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
+			write(sfd, sendBuffer, strlen(sendBuffer));
+			buff_idx = 0;
+			memset(sendBuffer,'\0', sizeof(sendBuffer));
 		}
-		sendBuffer[buff_idx] = '\0';
-		// printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
-		write(sfd, sendBuffer, strlen(sendBuffer));
-		buff_idx = 0;
-		memset(sendBuffer, '\0', sizeof(sendBuffer));
 	}
+	sendBuffer[buff_idx] = '\0';
+	// printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
+	write(sfd, sendBuffer, strlen(sendBuffer));
+	buff_idx = 0;
+	memset(sendBuffer, '\0', sizeof(sendBuffer));
+
 	// this bit reads the socket for the response from the server
-	while((read_loc = read(sfd, recieveBuffer, sizeof(recieveBuffer)-1)) > 0) {
+	if((read_loc = read(sfd, recieveBuffer, sizeof(recieveBuffer)-1)) > 0) {
 		recieveBuffer[read_loc] = 0;
 		if(fputs(recieveBuffer, stdout) == EOF) {
 			printf("\nError: fputs is bad\n");

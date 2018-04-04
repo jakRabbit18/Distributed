@@ -53,6 +53,38 @@ things we need for a server
 
 
 #define BUFFSIZE 1024
+#define LSH_TOK_BUFSIZE 64
+#define LSH_TOK_DELIM " \t\r\n\a"
+char **lsh_split_line(char *line)
+{
+  int bufsize = LSH_TOK_BUFSIZE, position = 0;
+  char **tokens = malloc(bufsize * sizeof(char*));
+  char *token;
+ 
+  if (!tokens) {
+    fprintf(stderr, "lsh: allocation error\n");
+    exit(EXIT_FAILURE);
+  }
+ 
+  token = strtok(line, LSH_TOK_DELIM);
+  while (token != NULL) {
+    tokens[position] = token;
+    position++;
+ 
+    if (position >= bufsize) {
+      bufsize += LSH_TOK_BUFSIZE;
+      tokens = realloc(tokens, bufsize * sizeof(char*));
+      if (!tokens) {
+        fprintf(stderr, "lsh: allocation error\n");
+        exit(EXIT_FAILURE);
+      }
+    }
+ 
+    token = strtok(NULL, LSH_TOK_DELIM);
+  }
+  tokens[position] = NULL;
+  return tokens;
+}
 
 struct Node{
     // Any data type can be stored in this node
@@ -179,19 +211,28 @@ int main(int argc, char **argv) {
 			printf("Child pid: %ld\n", (long) me);
 
 			// close the listening socket
-			close(lfd);
+			// close(lfd);
 			printf("close lfd\n");
 			// pipe output to the socket
-			// dup2(cfd, STDOUT_FILENO);
+			dup2(cfd, STDOUT_FILENO);
+			whie((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0) {
+				
+			}
 
-			printf("Closed lfd, ran dup2\n");
+			// printf("Closed lfd, ran dup2\n");
 			// read whatever is sent from the client in batches of BUFFSIZE
 			while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0){
 				readBuffer[read_res] = '\0';
-				printf("%s, %ld, %d\n", readBuffer, strlen(readBuffer), read_res);
-				write(cfd, readBuffer, strlen(readBuffer));
+				// printf("%s, %ld, %d\n", readBuffer, strlen(readBuffer), read_res);
 				if(strcmp(readBuffer, "exit") == 0) {
 					break;
+				}
+				char **args;
+				args = lsh_split_line(readBuffer);
+				// TODO:
+				// add specific commands (cd, help, etc)
+				if(execvp(args[0], args) == -1) {
+					printf("Could not execute command, try another.\n");
 				}
 				memset(readBuffer, '\0', sizeof(readBuffer));
 
