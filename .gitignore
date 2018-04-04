@@ -5,5 +5,7 @@ Assignment_1/DUMP
 Assignment_1/mytest*
 */*.o
 */makefile
+Assignment_2/server
+Assignment_2/client
 
 
