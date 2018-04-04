@@ -50,11 +50,25 @@ things we need for a server
 #include <sys/socket.h>
 #include <sys/wait.h>
 
-
-
 #define BUFFSIZE 1024
+#define PASSWORD "password"
+#define USERNAME "user"
 #define LSH_TOK_BUFSIZE 64
 #define LSH_TOK_DELIM " \t\r\n\a"
+
+unsigned long hash;
+// simple hash function from 
+// https://stackoverflow.com/questions/7666509/hash-function-for-string
+unsigned long hash_str (unsigned char *str) {
+    int c;
+
+    while (c = *str++)
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+    return hash;
+}
+
+
 char **lsh_split_line(char *line)
 {
   int bufsize = LSH_TOK_BUFSIZE, position = 0;
@@ -215,11 +229,30 @@ int main(int argc, char **argv) {
 			printf("close lfd\n");
 			// pipe output to the socket
 			dup2(cfd, STDOUT_FILENO);
-			/*
+
 			while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0) {
-				
+				readBuffer[read_res] = '\0';
+				if(strcmp(readBuffer, USERNAME) != 0) {
+					return EXIT_FAILURE;
+				}
 			}
-			*/
+
+			memset(readBuffer, '\0', sizeof(readBuffer));
+			hash = (unsigned long) rand();
+			sprintf(sendBuffer, "%ld", hash);
+			write(cfd, sendBuffer, strlen(sendBuffer));
+			unsigned long local_hash = hash_str(PASSWORD);
+
+			while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0) {
+				unsigned long foreign_hash = strtoul(readBuffer, NULL, 10);
+				readBuffer[read_res] = '\0';
+				if(local_hash != foreign_hash) {
+					return EXIT_FAILURE;
+				}
+			}
+			memset(readBuffer, '\0', sizeof(readBuffer));
+			memset(sendBuffer, '\0', sizeof(sendBuffer));
+
 
 			// printf("Closed lfd, ran dup2\n");
 			// read whatever is sent from the client in batches of BUFFSIZE
