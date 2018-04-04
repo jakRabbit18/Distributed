@@ -151,15 +151,23 @@ int main(int argc, char **argv) {
 		   	  printf("in child\n");
 		   	  //close listening socket
 		   	  close(lfd);
+		   	  //duplicate original socket to redirect output
+		   	  dup2(cfd, STDOUT_FILENO);
+		   	  //close(cfd);
 		   	  //authenticate
 		   	  //run command from client
 			  while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0){
 				  readBuffer[read_res] = '\0';
-				  printf("%s, %ld, %d\n", readBuffer, strlen(readBuffer), read_res);
+				  //printf("%s, %ld, %d\n", readBuffer, strlen(readBuffer), read_res);
+				  //create args list from read buffer
+				  char **args = malloc(sizeof(char *) * 1);
+				  args[0] = readBuffer;
+				  if(execvp(args[0], args) == -1){
+				  	printf("invalid command\n");
+				  	perror("error in execvp");
+				  }
 				  memset(readBuffer, '\0', sizeof(readBuffer));
 			  }
-
-
 		      _exit(0);  /* Note that we do not use exit() */
 		   }
 		   else
@@ -172,8 +180,6 @@ int main(int argc, char **argv) {
 		   	  //close accepted socket
 		   	  close(cfd);
 		   	  //resume accept loop
-		   	  //do we need to exit?
-		      //exit(0);
 		   }
 		// printf("%s\n", readBuffer);
 
