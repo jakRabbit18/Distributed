@@ -48,7 +48,11 @@ things we need for a server
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <time.h>
 
+
+#define FALSE 0
+#define TRUE 1
 
 #define BUFFSIZE 1024
 int main(int argc, char **argv) {
@@ -79,6 +83,46 @@ int main(int argc, char **argv) {
 	// TODO: add timeouts
 	char connect = 0;
 
+	// Authenticate client
+	/*
+	int authenticated = FALSE;
+	int read_result;
+	while(1) {
+		while(!cfd) {
+			cfd = accept(lfd, (struct sockaddr*) NULL, NULL);
+		}
+		printf("Connected!\n");
+		// printf("%s\n", readBuffer);
+		while((read_result = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0){
+			readBuffer[read_result] = '\0';
+			char username[strlen(readBuffer)];
+			strcpy(username, readBuffer);
+			printf("username: %s\n", username);
+			//generate random number
+			srand(time(NULL));
+			int r = rand();
+			//put random number into sendBuffer
+			sprintf(sendBuffer, "%d", r);
+			//sendBuffer[0] = r;
+			printf("rand num on server: %d\n", r);
+			//send random number to client
+			if((write(cfd, sendBuffer, strlen(sendBuffer))) == -1){
+				fprintf(stderr, "failure sending message\n");
+				close(cfd);
+				break;
+			}
+
+			printf("%s, %ld, %d\n", readBuffer, strlen(readBuffer), read_result);
+			memset(readBuffer, '\0', sizeof(readBuffer));
+		}
+
+		close(cfd);
+		cfd = 0;
+		memset(readBuffer, '\0', sizeof(readBuffer));
+	
+	}
+	*/
+
 	// we have a connection! now we can start up the shell
 	int read_res; 
 	while(1) {
@@ -86,17 +130,56 @@ int main(int argc, char **argv) {
 			cfd = accept(lfd, (struct sockaddr*) NULL, NULL);
 		}
 		printf("Connected!\n");
+		//spawn child process
+		pid_t pid;
+		pid = fork();
+		if (pid == -1)
+		   {
+		      /* Error:
+		       * When fork() returns -1, an error happened
+		       * (for example, number of processes reached the limit).
+		       */
+		      fprintf(stderr, "can't fork, error %d\n", errno);
+		      exit(EXIT_FAILURE);
+		   }
+		   else if (pid == 0)
+		   {
+		      /* Child process:
+		       * When fork() returns 0, we are in
+		       * the child process.
+		       */
+		   	  printf("in child\n");
+		   	  //close listening socket
+		   	  close(lfd);
+		   	  //authenticate
+		   	  //run command from client
+			  while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0){
+				  readBuffer[read_res] = '\0';
+				  printf("%s, %ld, %d\n", readBuffer, strlen(readBuffer), read_res);
+				  memset(readBuffer, '\0', sizeof(readBuffer));
+			  }
+
+
+		      _exit(0);  /* Note that we do not use exit() */
+		   }
+		   else
+		   {
+		      /* When fork() returns a positive number, we are in the parent process
+		       * (the fork return value is the PID of the newly created child process)
+		       * Again we count up to ten.
+		       */
+		      printf("in parent\n");
+		   	  //close accepted socket
+		   	  close(cfd);
+		   	  //resume accept loop
+		   	  //do we need to exit?
+		      //exit(0);
+		   }
 		// printf("%s\n", readBuffer);
-		while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0){
-			readBuffer[read_res] = '\0';
-			printf("%s, %ld, %d\n", readBuffer, strlen(readBuffer), read_res);
-			memset(readBuffer, '\0', sizeof(readBuffer));
-		}
 
 		close(cfd);
 		cfd = 0;
 		memset(readBuffer, '\0', sizeof(readBuffer));
-		
 	}
 
 	if(read_res < 0) {

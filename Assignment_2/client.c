@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
 	int sfd = 0, cfd = 0, read_loc=0;
 	char recieveBuffer[BUFFSIZE];
 	char sendBuffer[BUFFSIZE];
+	char usernameSendBuffer[BUFFSIZE];
 	struct sockaddr_in server_address;
 
 	// set up the buffers and the socket
@@ -62,6 +63,7 @@ int main(int argc, char **argv) {
 		printf("\nError: inet error\n");
 		return 1;
 	}
+
 
 	if(cfd = connect(sfd, (struct sockaddr *)&server_address, sizeof(server_address)) < 0) {
 		printf("\nError: connection error, %s\n", strerror(errno));
@@ -86,6 +88,17 @@ int main(int argc, char **argv) {
 		write(sfd, sendBuffer, strlen(sendBuffer));
 		buff_idx = 0;
 		memset(sendBuffer, '\0', sizeof(sendBuffer));
+
+		//attempt to read server response
+		
+		if(read_loc = recv(sfd, recieveBuffer, sizeof(recieveBuffer) - 1, 0) > 0){
+			printf("read_loc: %d\n", read_loc);
+			//place null terminator at end of random number
+			puts("received message");
+			puts(recieveBuffer);
+			//printf("%s\n", recieveBuffer);
+		}
+		
 	}
 	// this bit reads the socket for the response from the server
 	// while((read_loc = read(sfd, recieveBuffer, sizeof(recieveBuffer)-1)) > 0) {
