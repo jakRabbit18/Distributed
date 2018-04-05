@@ -185,6 +185,21 @@ int execute_command(char **args){
 	return 1;
 }
 
+int execute_help(){
+	printf("distributed shell\n");
+	//specify possible command line options here
+	return 1;
+}
+
+int execute_cd(char **args){
+	//printf("%s\n", args[0]);
+	//printf("%s\n", args[1]);
+	if(chdir(args[1]) != 0){
+		perror("cd failed");
+	}
+	return 1;
+}
+
 int main(int argc, char **argv) {
 	// this is the main function where the main stuff happens
 	int lfd = 0, cfd = 0;
@@ -300,7 +315,15 @@ int main(int argc, char **argv) {
 					}
 					char **args;
 					args = lsh_split_line(readBuffer);
-					execute_command(args);
+					if(strcmp(args[0], "help") == 0){
+						execute_help();
+					}
+					else if(strcmp(args[0], "cd") == 0){
+						execute_cd(args);
+					}
+					else{
+						execute_command(args);
+					}
 					// TODO:
 					// add specific commands (cd, help, etc)
 					memset(readBuffer, '\0', sizeof(readBuffer));
