@@ -278,6 +278,7 @@ int main(int argc, char **argv) {
 			}
 
 			memset(readBuffer, '\0', sizeof(readBuffer));
+			srand(time(NULL));
 			hash = (unsigned long) rand();
 			sprintf(sendBuffer, "%ld", hash);
 			printf("hash on server: %s\n", sendBuffer);
