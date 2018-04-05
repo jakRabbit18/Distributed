@@ -38,7 +38,7 @@ things we need for a server
   - how to write command outputs back to client
 
   */
-
+#define _XOPEN_SOURCE
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdio.h>
@@ -231,7 +231,7 @@ int main(int argc, char **argv) {
 
 			while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0) {
 				readBuffer[read_res] = '\0';
-				printf("uname: %s\n", readBuffer);
+				printf("user name given: %s\n", readBuffer);
 				if(strcmp(readBuffer, USERNAME) != 0) {
 					return EXIT_FAILURE;
 				}
@@ -253,6 +253,7 @@ int main(int argc, char **argv) {
 				readBuffer[read_res] = '\0';
 				if(local_hash != foreign_hash) {
 					printf("failing in hash comparison\n");
+					close(cfd);
 					return EXIT_FAILURE;
 				}
 				break;

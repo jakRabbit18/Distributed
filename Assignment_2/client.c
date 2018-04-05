@@ -40,7 +40,7 @@ Steps:
 unsigned long hash;
 // simple hash function from 
 // https://stackoverflow.com/questions/7666509/hash-function-for-string
-unsigned long hash_str (unsigned char *str) {
+unsigned long hash_str (const char *str) {
     int c;
 
     while (c = *str++)
@@ -49,12 +49,66 @@ unsigned long hash_str (unsigned char *str) {
     return hash;
 }
 
+void wipe(char *buffer) {
+	memset(buffer, '\0', sizeof(buffer));
+}
+
+
+//TODO: add error checking for invalid username/password
+int authenticate(const char *uname, const char *password, char *receiveBuffer, char *sendBuffer, int sfd) {
+	printf("uname: %s\n", uname);
+	printf("password: %s\n", password);
+	write(sfd, uname, strlen(uname));
+	memset(sendBuffer, '\0', sizeof(sendBuffer));
+
+	//read for rand number sent from server
+	int read_res;
+	while((read_res = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
+		receiveBuffer[read_res] = '\0';
+		hash = strtoul(receiveBuffer, NULL, 10);
+		break;
+	}
+	wipe(receiveBuffer);
+
+	//create client hash and send to server for comparison
+	unsigned long client_hash = hash_str(password);
+	sprintf(sendBuffer, "%ld", client_hash);
+	write(sfd, sendBuffer, strlen(sendBuffer));
+	wipe(sendBuffer);
+
+	return 0;
+}
+
 int main(int argc, char **argv) {
 	//first set up some connection variables
-	int sfd = 0, cfd = 0, read_loc=0;
+	int sfd = 0, cfd = 0, read_loc=0, opt;
 	char receiveBuffer[BUFFSIZE];
 	char sendBuffer[BUFFSIZE];
+	char *command;
 	struct sockaddr_in server_address;
+
+	if(argc < 2) {
+		// no server was specified, print error and exit
+		printf("Error: no server specified\n");
+		exit(EXIT_FAILURE);
+	}
+
+	while(argc > 2 && (opt = getopt(argc, argv, "ch:")) != -1) {
+		switch(opt) {
+			case 'c':
+				//set the command to execute
+				command = optarg;
+				break;
+			case 'h':
+				// help message!
+				printf("Usage: ./client <server address> [-c command] [-h]");
+				break;
+			default: 
+				// unrecognized option
+				printf("What is this? %c: %s\n", opt, optarg);
+				break;
+		}
+	}
 
 	// set up the buffers and the socket
 	memset(receiveBuffer, '0', sizeof(receiveBuffer));
@@ -80,77 +134,61 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	//read and send username
+	//se
 	char x;
 	int idx = 0;
 	int buff_idx = 0;
-	char uname[50];
-	while((x = getchar()) != '\n') {
-		uname[idx++] = x;
-		sendBuffer[buff_idx++] = x;
-		if(idx == 49){
-			uname[idx] = '\0';
+	char *uname = "user";
+	char *password = "password";
+	if(authenticate(uname, password, receiveBuffer, sendBuffer, sfd) == -1){
+		exit(EXIT_FAILURE);
+	}
+
+    // read and send commands
+    // if no specific command was specified.
+	if(command != NULL) {
+		// this has been set, let's just put it in the send buffer and be done with it
+		if(strlen(command) > BUFFSIZE-1){
+			printf("Error: command contains too many characters\n");
+			exit(EXIT_FAILURE);
+		}
+		for(int i = 0; i < strlen(command); i++){
+			sendBuffer[i] = command[i];
+		}
+	} else {
+		// put this into "shell mode"
+		char c;
+		buff_idx =0;
+		char done = 0;
+		while(!done) {
+			while((c = getchar()) != '\n') {
+				sendBuffer[buff_idx++] = c;
+				if(buff_idx == BUFFSIZE-1){
+					sendBuffer[buff_idx] = '\0';
+					//printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
+					write(sfd, sendBuffer, strlen(sendBuffer));
+					buff_idx = 0;
+					wipe(sendBuffer);
+				}
+			}
 			sendBuffer[buff_idx] = '\0';
-			// printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
-			printf("uname: %s\n", uname);
-			write(sfd, sendBuffer, strlen(sendBuffer));
 			buff_idx = 0;
-			memset(sendBuffer,'\0', sizeof(sendBuffer));
+			if(write(sfd, sendBuffer, strlen(sendBuffer)) == -1) {
+				printf("Error: %s\n", strerror(errno));
+			}
+
+			if(strcmp(sendBuffer, "exit")){
+				done = 1;
+			}
+
+			wipe(sendBuffer);
 		}
 	}
-	sendBuffer[buff_idx] = '\0';
-	uname[idx] = '\0';
-	// printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
-	printf("uname: %s\n", uname);
-	write(sfd, sendBuffer, strlen(sendBuffer));
-	buff_idx = 0;
-	memset(sendBuffer, '\0', sizeof(sendBuffer));
 
-	//read password
-	char p;
-	idx = 0;
-	char password[50];
-	while((p = getchar()) != '\n') {
-		password[idx++] = p;
-		if(idx == 49){
-			password[idx] = '\0';
-			printf("password: %s\n", password);
-		}
-	}
-	password[idx] = '\0';
-	printf("password: %s\n", password);
-
-	//read for rand number sent from server
-	int read_res;
-	while((read_res = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
-		receiveBuffer[read_res] = '\0';
-		hash = strtoul(receiveBuffer, NULL, 10);
-		break;
-	}
-	memset(receiveBuffer, '\0', sizeof(receiveBuffer));
-
-	//create client hash and send to server for comparison
-	unsigned long client_hash = hash_str(password);
-	sprintf(sendBuffer, "%ld", client_hash);
-	write(sfd, sendBuffer, strlen(sendBuffer));
-
-    //read and send command
-	char c;
-	buff_idx =0;
-	while((c = getchar()) != '\n') {
-		sendBuffer[buff_idx++] = c;
-		if(buff_idx == BUFFSIZE-1){
-			sendBuffer[buff_idx] = '\0';
-			//printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
-			write(sfd, sendBuffer, strlen(sendBuffer));
-			buff_idx = 0;
-			memset(sendBuffer,'\0', sizeof(sendBuffer));
-		}
-	}
-	sendBuffer[buff_idx] = '\0';
-	// printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
-	write(sfd, sendBuffer, strlen(sendBuffer));
-	buff_idx = 0;
+	
+	
+	
+	
 	memset(sendBuffer, '\0', sizeof(sendBuffer));
 
 	// this bit reads the socket for the response from the server
