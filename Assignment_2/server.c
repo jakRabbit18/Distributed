@@ -55,6 +55,8 @@ things we need for a server
 #define USERNAME "user"
 #define LSH_TOK_BUFSIZE 64
 #define LSH_TOK_DELIM " \t\r\n\a"
+#define FALSE 0
+#define TRUE 1
 
 unsigned long hash;
 // simple hash function from 
@@ -67,7 +69,6 @@ unsigned long hash_str (unsigned char *str) {
 
     return hash;
 }
-
 
 //https://brennan.io/2015/01/16/write-a-shell-in-c/
 char **lsh_split_line(char *line)
@@ -159,6 +160,44 @@ struct Node *delete_node(struct Node *head, pid_t pid){
 
 	//still looking for the pid
 	return delete_node(n, pid);
+}
+
+int execute_command(char **args){
+	pid_t cmd_pid;
+	pid_t cmd_wpid;
+	int cmd_status;
+	cmd_pid = fork();
+	if(cmd_pid == 0){
+		//child proc
+		if(execvp(args[0], args) == -1) {
+			printf("Could not execute command, try another.\n");
+		}
+	}
+	else if (cmd_pid < 0){
+		perror("error in cmd fork");
+	}
+	else{
+		//parent proc
+		do {
+			cmd_wpid = waitpid(cmd_pid, &cmd_status, WUNTRACED);
+		} while (!WIFEXITED(cmd_status) && !WIFSIGNALED(cmd_status));
+	}
+	return 1;
+}
+
+int execute_help(){
+	printf("distributed shell\n");
+	//specify possible command line options here
+	return 1;
+}
+
+int execute_cd(char **args){
+	//printf("%s\n", args[0]);
+	//printf("%s\n", args[1]);
+	if(chdir(args[1]) != 0){
+		perror("cd failed");
+	}
+	return 1;
 }
 
 int main(int argc, char **argv) {
@@ -261,24 +300,37 @@ int main(int argc, char **argv) {
 			memset(readBuffer, '\0', sizeof(readBuffer));
 			memset(sendBuffer, '\0', sizeof(sendBuffer));
 
+			//now client is authenticated
+
 			// pipe output to the socket
 			dup2(cfd, STDOUT_FILENO);
+			dup2(cfd, STDERR_FILENO);
 			// read whatever is sent from the client in batches of BUFFSIZE
-			while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0){
-				readBuffer[read_res] = '\0';
-				// printf("%s, %ld, %d\n", readBuffer, strlen(readBuffer), read_res);
-				if(strcmp(readBuffer, "exit") == 0) {
+			int exit = FALSE;
+			while(!exit){
+				while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0){
+					readBuffer[read_res] = '\0';
+					if(strcmp(readBuffer, "exit") == 0) {
+						exit = TRUE;
+						break;
+					}
+					char **args;
+					args = lsh_split_line(readBuffer);
+					if(strcmp(args[0], "help") == 0){
+						execute_help();
+					}
+					else if(strcmp(args[0], "cd") == 0){
+						execute_cd(args);
+					}
+					else{
+						execute_command(args);
+					}
+					// TODO:
+					// add specific commands (cd, help, etc)
+					memset(readBuffer, '\0', sizeof(readBuffer));
+					free(args);
 					break;
 				}
-				char **args;
-				args = lsh_split_line(readBuffer);
-				// TODO:
-				// add specific commands (cd, help, etc)
-				if(execvp(args[0], args) == -1) {
-					printf("Could not execute command, try another.\n");
-				}
-				memset(readBuffer, '\0', sizeof(readBuffer));
-				break;
 			}
 			//clean up at the end
 			close(cfd);
@@ -292,7 +344,6 @@ int main(int argc, char **argv) {
 	if(read_res < 0) {
 		printf("read error\n");
 	}
-
 
 	while(pid_head != NULL && pid != 0){
 		printf("waiting for children of %ld to finish\n", (long) getpid());

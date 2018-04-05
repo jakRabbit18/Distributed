@@ -36,6 +36,8 @@ Steps:
 #include <sys/socket.h>
 
 #define BUFFSIZE 1024
+#define FALSE 0
+#define TRUE 1
 
 unsigned long hash;
 // simple hash function from 
@@ -134,13 +136,15 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	//se
+	// authenticate then run commands
 	char x;
 	int idx = 0;
 	int buff_idx = 0;
+	int isCD = FALSE;
 	char *uname = "user";
 	char *password = "password";
 	if(authenticate(uname, password, receiveBuffer, sendBuffer, sfd) == -1){
+		printf("Error: authentication failed\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -155,15 +159,34 @@ int main(int argc, char **argv) {
 		for(int i = 0; i < strlen(command); i++){
 			sendBuffer[i] = command[i];
 		}
+
+		if(write(sfd, sendBuffer, strlen(sendBuffer)) == -1) {
+			printf("Error: %s\n", strerror(errno));
+		}
+
+		if(strcmp(sendBuffer, "cd") == 0) {
+			isCD = TRUE
+		}
+		// this bit reads the socket for the response from the server (no response from cd)
+		if(!isCD){
+			if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
+				receiveBuffer[read_loc] = 0;
+				if(fputs(receiveBuffer, stdout) == EOF) {
+					printf("\nError: fputs is bad\n");
+				}
+			}
+		}
+
 	} else {
 		// put this into "shell mode"
 		char c;
 		buff_idx =0;
-		char done = 0;
+		char done = FALSE;
 		while(!done) {
 			while((c = getchar()) != '\n') {
 				sendBuffer[buff_idx++] = c;
 				if(buff_idx == BUFFSIZE-1){
+					isCD = sendBuffer[0] == 'c' && sendBuffer[1] == 'd';
 					sendBuffer[buff_idx] = '\0';
 					//printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
 					write(sfd, sendBuffer, strlen(sendBuffer));
@@ -178,34 +201,56 @@ int main(int argc, char **argv) {
 			}
 
 			if(strcmp(sendBuffer, "exit")){
-				done = 1;
+				done = TRUE;
 			}
 
 			wipe(sendBuffer);
+			// this bit reads the socket for the response from the server (no response from cd)
+			if(!isCD){
+				if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
+					receiveBuffer[read_loc] = 0;
+					if(fputs(receiveBuffer, stdout) == EOF) {
+						printf("\nError: fputs is bad\n");
+					}
+				}
+			}
 		}
 	}
 
 	
-	
-	
-	
-	memset(sendBuffer, '\0', sizeof(sendBuffer));
-
-	// this bit reads the socket for the response from the server
-	if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
-		receiveBuffer[read_loc] = 0;
-		if(fputs(receiveBuffer, stdout) == EOF) {
-			printf("\nError: fputs is bad\n");
+	// this bit reads the socket for the response from the server (no response from cd)
+	if(!isCD){
+		if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
+			receiveBuffer[read_loc] = 0;
+			if(fputs(receiveBuffer, stdout) == EOF) {
+				printf("\nError: fputs is bad\n");
+			}
 		}
 	}
+	wipe(sendBuffer);
+	
+//============
+	password[idx] = '\0';
+	printf("password: %s\n", password);
 
+	//read for rand number sent from server
+	int read_res;
+	while((read_res = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
+		receiveBuffer[read_res] = '\0';
+		hash = strtoul(receiveBuffer, NULL, 10);
+		break;
+	}
+	memset(receiveBuffer, '\0', sizeof(receiveBuffer));
+
+	//create client hash and send to server for comparison
+	unsigned long client_hash = hash_str(password);
+	sprintf(sendBuffer, "%ld", client_hash);
+	write(sfd, sendBuffer, strlen(sendBuffer));
+
+   
 	if(read_loc < 0) {
 		printf("\nError: reading error\n");
 	}
 
 	return 0;
-
-
-
-
 }
