@@ -163,14 +163,12 @@ struct Node *delete_node(struct Node *head, pid_t pid){
 }
 
 int execute_command(char **args){
-	printf("executing: %s\n", args[0]);
 	pid_t cmd_pid;
 	pid_t cmd_wpid;
 	int cmd_status;
 	cmd_pid = fork();
 	if(cmd_pid == 0){
 		//child proc
-		printf("in child cmd\n");
 		if(execvp(args[0], args) == -1) {
 			printf("Could not execute command, try another.\n");
 		}
@@ -180,14 +178,11 @@ int execute_command(char **args){
 	}
 	else{
 		//parent proc
-		printf("in parent cmd\n");
-		cmd_wpid = waitpid(cmd_pid, &cmd_status, WUNTRACED);
-		/*
 		do {
 			cmd_wpid = waitpid(cmd_pid, &cmd_status, WUNTRACED);
 		} while (!WIFEXITED(cmd_status) && !WIFSIGNALED(cmd_status));
-		*/
 	}
+	return 1;
 }
 
 int main(int argc, char **argv) {
@@ -293,12 +288,12 @@ int main(int argc, char **argv) {
 
 			// pipe output to the socket
 			dup2(cfd, STDOUT_FILENO);
+			dup2(cfd, STDERR_FILENO);
 			// read whatever is sent from the client in batches of BUFFSIZE
 			int exit = FALSE;
 			while(!exit){
 				while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0){
 					readBuffer[read_res] = '\0';
-					// printf("%s, %ld, %d\n", readBuffer, strlen(readBuffer), read_res);
 					if(strcmp(readBuffer, "exit") == 0) {
 						exit = TRUE;
 						break;
@@ -309,6 +304,7 @@ int main(int argc, char **argv) {
 					// TODO:
 					// add specific commands (cd, help, etc)
 					memset(readBuffer, '\0', sizeof(readBuffer));
+					free(args);
 					break;
 				}
 			}
@@ -324,7 +320,6 @@ int main(int argc, char **argv) {
 	if(read_res < 0) {
 		printf("read error\n");
 	}
-
 
 	while(pid_head != NULL && pid != 0){
 		printf("waiting for children of %ld to finish\n", (long) getpid());
