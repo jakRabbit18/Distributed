@@ -36,6 +36,8 @@ Steps:
 #include <sys/socket.h>
 
 #define BUFFSIZE 1024
+#define FALSE 0
+#define TRUE 1
 
 unsigned long hash;
 // simple hash function from 
@@ -135,39 +137,46 @@ int main(int argc, char **argv) {
 	write(sfd, sendBuffer, strlen(sendBuffer));
 
     //read and send command
-	char c;
-	buff_idx =0;
-	while((c = getchar()) != '\n') {
-		sendBuffer[buff_idx++] = c;
-		if(buff_idx == BUFFSIZE-1){
-			sendBuffer[buff_idx] = '\0';
-			//printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
-			write(sfd, sendBuffer, strlen(sendBuffer));
-			buff_idx = 0;
-			memset(sendBuffer,'\0', sizeof(sendBuffer));
+    int exit = FALSE;
+	while(!exit){
+		char c;
+		buff_idx =0;
+		while((c = getchar()) != '\n') {
+			sendBuffer[buff_idx++] = c;
+			if(buff_idx == BUFFSIZE-1){
+				sendBuffer[buff_idx] = '\0';
+				if(strcmp(sendBuffer, "exit") == 0) {
+					printf("exiting...\n");
+					exit = TRUE;
+				}
+				//printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
+				write(sfd, sendBuffer, strlen(sendBuffer));
+				buff_idx = 0;
+				memset(sendBuffer,'\0', sizeof(sendBuffer));
+			}
 		}
-	}
-	sendBuffer[buff_idx] = '\0';
-	// printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
-	write(sfd, sendBuffer, strlen(sendBuffer));
-	buff_idx = 0;
-	memset(sendBuffer, '\0', sizeof(sendBuffer));
-
-	// this bit reads the socket for the response from the server
-	if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
-		receiveBuffer[read_loc] = 0;
-		if(fputs(receiveBuffer, stdout) == EOF) {
-			printf("\nError: fputs is bad\n");
+		sendBuffer[buff_idx] = '\0';
+		if(strcmp(sendBuffer, "exit") == 0) {
+			printf("exiting...\n");
+			exit = TRUE;
 		}
-	}
+		// printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
+		write(sfd, sendBuffer, strlen(sendBuffer));
+		buff_idx = 0;
+		memset(sendBuffer, '\0', sizeof(sendBuffer));
 
-	if(read_loc < 0) {
-		printf("\nError: reading error\n");
+		// this bit reads the socket for the response from the server
+		if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
+			receiveBuffer[read_loc] = 0;
+			if(fputs(receiveBuffer, stdout) == EOF) {
+				printf("\nError: fputs is bad\n");
+			}
+		}
+
+		if(read_loc < 0) {
+			printf("\nError: reading error\n");
+		}
 	}
 
 	return 0;
-
-
-
-
 }
