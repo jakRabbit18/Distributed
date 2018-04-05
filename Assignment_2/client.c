@@ -70,13 +70,20 @@ int authenticate(const char *uname, const char *password, char *receiveBuffer, c
 		hash = strtoul(receiveBuffer, NULL, 10);
 		break;
 	}
-	wipe(receiveBuffer);
+	memset(receiveBuffer, '\0', sizeof(receiveBuffer));
 
 	//create client hash and send to server for comparison
 	unsigned long client_hash = hash_str(password);
 	sprintf(sendBuffer, "%ld", client_hash);
 	write(sfd, sendBuffer, strlen(sendBuffer));
-	wipe(sendBuffer);
+	memset(sendBuffer, '\0', sizeof(sendBuffer));
+	if((read_res = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
+		receiveBuffer[read_res] = '\0';
+		if(strcmp(receiveBuffer, "failed") == 0){
+			printf("Auth failed\n");
+			return -1;
+		}
+	}
 
 	return 0;
 }
@@ -87,16 +94,14 @@ int main(int argc, char **argv) {
 	char receiveBuffer[BUFFSIZE];
 	char sendBuffer[BUFFSIZE];
 	char *command;
+	char *server;
 	struct sockaddr_in server_address;
 
-	if(argc < 2) {
-		// no server was specified, print error and exit
-		printf("Error: no server specified\n");
-		exit(EXIT_FAILURE);
-	}
-
-	while(argc > 2 && (opt = getopt(argc, argv, "ch:")) != -1) {
+	while(argc > 2 && (opt = getopt(argc, argv, "hs:c:")) != -1) {
 		switch(opt) {
+			case 's':
+				server = optarg;
+				break;
 			case 'c':
 				//set the command to execute
 				command = optarg;
@@ -110,6 +115,11 @@ int main(int argc, char **argv) {
 				printf("What is this? %c: %s\n", opt, optarg);
 				break;
 		}
+	}
+
+	if(server == NULL) {
+		printf("No server specified\n");
+		exit(EXIT_FAILURE);
 	}
 
 	// set up the buffers and the socket
@@ -126,8 +136,8 @@ int main(int argc, char **argv) {
 	server_address.sin_family = AF_INET;
 	server_address.sin_port = htons(5000);
 
-	if(inet_pton(AF_INET, argv[1], &server_address.sin_addr)<=0) {
-		printf("\nError: inet error\n");
+	if(inet_pton(AF_INET, server, &server_address.sin_addr)<=0) {
+		printf("\nError: inet error, %s\n", argv[1]);
 		return 1;
 	}
 
@@ -164,9 +174,8 @@ int main(int argc, char **argv) {
 			printf("Error: %s\n", strerror(errno));
 		}
 
-		if(strcmp(sendBuffer, "cd") == 0) {
-			isCD = TRUE
-		}
+		isCD = strcmp(sendBuffer, "cd") == 0;
+
 		// this bit reads the socket for the response from the server (no response from cd)
 		if(!isCD){
 			if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
@@ -191,7 +200,7 @@ int main(int argc, char **argv) {
 					//printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
 					write(sfd, sendBuffer, strlen(sendBuffer));
 					buff_idx = 0;
-					wipe(sendBuffer);
+					memset(sendBuffer, '\0', sizeof(sendBuffer));
 				}
 			}
 			sendBuffer[buff_idx] = '\0';
@@ -204,7 +213,7 @@ int main(int argc, char **argv) {
 				done = TRUE;
 			}
 
-			wipe(sendBuffer);
+			memset(sendBuffer, '\0', sizeof(sendBuffer));
 			// this bit reads the socket for the response from the server (no response from cd)
 			if(!isCD){
 				if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
@@ -227,26 +236,7 @@ int main(int argc, char **argv) {
 			}
 		}
 	}
-	wipe(sendBuffer);
-	
-//============
-	password[idx] = '\0';
-	printf("password: %s\n", password);
-
-	//read for rand number sent from server
-	int read_res;
-	while((read_res = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
-		receiveBuffer[read_res] = '\0';
-		hash = strtoul(receiveBuffer, NULL, 10);
-		break;
-	}
-	memset(receiveBuffer, '\0', sizeof(receiveBuffer));
-
-	//create client hash and send to server for comparison
-	unsigned long client_hash = hash_str(password);
-	sprintf(sendBuffer, "%ld", client_hash);
-	write(sfd, sendBuffer, strlen(sendBuffer));
-
+	memset(sendBuffer, '\0', sizeof(sendBuffer));
    
 	if(read_loc < 0) {
 		printf("\nError: reading error\n");
