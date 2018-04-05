@@ -69,6 +69,7 @@ unsigned long hash_str (unsigned char *str) {
 }
 
 
+//https://brennan.io/2015/01/16/write-a-shell-in-c/
 char **lsh_split_line(char *line)
 {
   int bufsize = LSH_TOK_BUFSIZE, position = 0;
