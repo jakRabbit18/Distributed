@@ -37,15 +37,27 @@ Steps:
 
 #define BUFFSIZE 1024
 
+unsigned long hash;
+// simple hash function from 
+// https://stackoverflow.com/questions/7666509/hash-function-for-string
+unsigned long hash_str (unsigned char *str) {
+    int c;
+
+    while (c = *str++)
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+    return hash;
+}
+
 int main(int argc, char **argv) {
 	//first set up some connection variables
 	int sfd = 0, cfd = 0, read_loc=0;
-	char recieveBuffer[BUFFSIZE];
+	char receiveBuffer[BUFFSIZE];
 	char sendBuffer[BUFFSIZE];
 	struct sockaddr_in server_address;
 
 	// set up the buffers and the socket
-	memset(recieveBuffer, '0', sizeof(recieveBuffer));
+	memset(receiveBuffer, '0', sizeof(receiveBuffer));
 	memset(sendBuffer, '0', sizeof(sendBuffer));
 	sfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(sfd < 0) {
@@ -94,6 +106,34 @@ int main(int argc, char **argv) {
 	buff_idx = 0;
 	memset(sendBuffer, '\0', sizeof(sendBuffer));
 
+	//read password
+	char p;
+	idx = 0;
+	char password[50];
+	while((p = getchar()) != '\n') {
+		password[idx++] = p;
+		if(idx == 49){
+			password[idx] = '\0';
+			printf("password: %s\n", password);
+		}
+	}
+	password[idx] = '\0';
+	printf("password: %s\n", password);
+
+	//read for rand number sent from server
+	int read_res;
+	while((read_res = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
+		receiveBuffer[read_res] = '\0';
+		hash = strtoul(receiveBuffer, NULL, 10);
+		break;
+	}
+	memset(receiveBuffer, '\0', sizeof(receiveBuffer));
+
+	//create client hash and send to server for comparison
+	unsigned long client_hash = hash_str(password);
+	sprintf(sendBuffer, "%ld", client_hash);
+	write(sfd, sendBuffer, strlen(sendBuffer));
+
     //read and send command
 	char c;
 	buff_idx =0;
@@ -114,9 +154,9 @@ int main(int argc, char **argv) {
 	memset(sendBuffer, '\0', sizeof(sendBuffer));
 
 	// this bit reads the socket for the response from the server
-	if((read_loc = read(sfd, recieveBuffer, sizeof(recieveBuffer)-1)) > 0) {
-		recieveBuffer[read_loc] = 0;
-		if(fputs(recieveBuffer, stdout) == EOF) {
+	if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
+		receiveBuffer[read_loc] = 0;
+		if(fputs(receiveBuffer, stdout) == EOF) {
 			printf("\nError: fputs is bad\n");
 		}
 	}

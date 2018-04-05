@@ -225,36 +225,42 @@ int main(int argc, char **argv) {
 			printf("Child pid: %ld\n", (long) me);
 
 			// close the listening socket
-			// close(lfd);
+			//close(lfd);
 			printf("close lfd\n");
-			// pipe output to the socket
-			dup2(cfd, STDOUT_FILENO);
 
 			while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0) {
 				readBuffer[read_res] = '\0';
+				printf("uname: %s\n", readBuffer);
 				if(strcmp(readBuffer, USERNAME) != 0) {
 					return EXIT_FAILURE;
 				}
+				break;
 			}
 
 			memset(readBuffer, '\0', sizeof(readBuffer));
 			hash = (unsigned long) rand();
 			sprintf(sendBuffer, "%ld", hash);
+			printf("hash on server: %s\n", sendBuffer);
 			write(cfd, sendBuffer, strlen(sendBuffer));
+			printf("server password: %s\n", PASSWORD);
 			unsigned long local_hash = hash_str(PASSWORD);
 
 			while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0) {
 				unsigned long foreign_hash = strtoul(readBuffer, NULL, 10);
+				printf("local hash: %ld\n", local_hash);
+				printf("foreign hash: %ld\n", foreign_hash);
 				readBuffer[read_res] = '\0';
 				if(local_hash != foreign_hash) {
+					printf("failing in hash comparison\n");
 					return EXIT_FAILURE;
 				}
+				break;
 			}
 			memset(readBuffer, '\0', sizeof(readBuffer));
 			memset(sendBuffer, '\0', sizeof(sendBuffer));
 
-
-			// printf("Closed lfd, ran dup2\n");
+			// pipe output to the socket
+			dup2(cfd, STDOUT_FILENO);
 			// read whatever is sent from the client in batches of BUFFSIZE
 			while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0){
 				readBuffer[read_res] = '\0';
@@ -270,7 +276,7 @@ int main(int argc, char **argv) {
 					printf("Could not execute command, try another.\n");
 				}
 				memset(readBuffer, '\0', sizeof(readBuffer));
-
+				break;
 			}
 			//clean up at the end
 			close(cfd);
