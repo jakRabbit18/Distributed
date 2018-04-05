@@ -138,6 +138,7 @@ int main(int argc, char **argv) {
 
     //read and send command
     int exit = FALSE;
+    int isCD = FALSE;
 	while(!exit){
 		char c;
 		buff_idx =0;
@@ -145,32 +146,44 @@ int main(int argc, char **argv) {
 		while((c = getchar()) != '\n') {
 			sendBuffer[buff_idx++] = c;
 			if(buff_idx == BUFFSIZE-1){
+				if(sendBuffer[0] == 'c' && sendBuffer[1] == 'd'){
+					isCD = TRUE;
+				}
+				else{
+					isCD = FALSE;
+				}
 				sendBuffer[buff_idx] = '\0';
 				if(strcmp(sendBuffer, "exit") == 0) {
 					printf("exiting...\n");
 					exit = TRUE;
 				}
-				//printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
 				write(sfd, sendBuffer, strlen(sendBuffer));
 				buff_idx = 0;
 				memset(sendBuffer,'\0', sizeof(sendBuffer));
 			}
+		}
+		if(sendBuffer[0] == 'c' && sendBuffer[1] == 'd'){
+			isCD = TRUE;
+		}
+		else{
+			isCD = FALSE;
 		}
 		sendBuffer[buff_idx] = '\0';
 		if(strcmp(sendBuffer, "exit") == 0) {
 			printf("exiting...\n");
 			exit = TRUE;
 		}
-		// printf("\nbuff_idx: %d, %s, %ld\n", buff_idx, sendBuffer, strlen(sendBuffer));
 		write(sfd, sendBuffer, strlen(sendBuffer));
 		buff_idx = 0;
 		memset(sendBuffer, '\0', sizeof(sendBuffer));
 
-		// this bit reads the socket for the response from the server
-		if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
-			receiveBuffer[read_loc] = 0;
-			if(fputs(receiveBuffer, stdout) == EOF) {
-				printf("\nError: fputs is bad\n");
+		// this bit reads the socket for the response from the server (no response from cd)
+		if(!isCD){
+			if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
+				receiveBuffer[read_loc] = 0;
+				if(fputs(receiveBuffer, stdout) == EOF) {
+					printf("\nError: fputs is bad\n");
+				}
 			}
 		}
 
