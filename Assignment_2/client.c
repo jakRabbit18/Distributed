@@ -141,6 +141,7 @@ int main(int argc, char **argv) {
 	while(!exit){
 		char c;
 		buff_idx =0;
+		printf(">");
 		while((c = getchar()) != '\n') {
 			sendBuffer[buff_idx++] = c;
 			if(buff_idx == BUFFSIZE-1){
