@@ -301,6 +301,7 @@ int main(int argc, char **argv) {
 					return EXIT_FAILURE;
 				}
 				else{
+					printf("successfully authenticated\n");
 					sprintf(sendBuffer, "%s", "authenticated");
 					write(cfd, sendBuffer, strlen(sendBuffer));
 				}

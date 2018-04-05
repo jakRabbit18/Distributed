@@ -99,7 +99,7 @@ int authenticate(const char *uname, const char *password, int sfd) {
 
 int main(int argc, char **argv) {
 	//first set up some connection variables
-	int sfd = 0, cfd = 0, read_loc=0, opt;
+	int sfd = 0, cfd = 0, read_loc = 0,opt;
 	char *command;
 	char *server;
 	struct sockaddr_in server_address;
@@ -165,11 +165,10 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	printf("command: %s\n", command);
-
-    // read and send commands
+	// read and send commands
     // if no specific command was specified.
 	if(command != NULL) {
+		printf("command: %s\n", command);
 		// this has been set, let's just put it in the send buffer and be done with it
 		if(strlen(command) > BUFFSIZE-1){
 			printf("Error: command contains too many characters\n");
@@ -197,6 +196,7 @@ int main(int argc, char **argv) {
 
 	} else {
 		// put this into "shell mode"
+		printf("In shell mode\n");
 		char c;
 		buff_idx =0;
 		char done = FALSE;
@@ -212,20 +212,21 @@ int main(int argc, char **argv) {
 					memset(sendBuffer, '\0', sizeof(sendBuffer));
 				}
 			}
+			printf("Sending %s\n", sendBuffer);
 			sendBuffer[buff_idx] = '\0';
 			buff_idx = 0;
 			if(write(sfd, sendBuffer, strlen(sendBuffer)) == -1) {
 				printf("Error: %s\n", strerror(errno));
 			}
 
-			if(strcmp(sendBuffer, "exit")){
+			if(strcmp(sendBuffer, "exit") == 0){
 				done = TRUE;
 			}
 
 			memset(sendBuffer, '\0', sizeof(sendBuffer));
 			// this bit reads the socket for the response from the server (no response from cd)
 			if(!isCD){
-				if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
+				while((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
 					receiveBuffer[read_loc] = 0;
 					if(fputs(receiveBuffer, stdout) == EOF) {
 						printf("\nError: fputs is bad\n");
@@ -234,22 +235,6 @@ int main(int argc, char **argv) {
 			}
 		}
 	}
-
-	
-	// this bit reads the socket for the response from the server (no response from cd)
-	if(!isCD){
-		if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
-			receiveBuffer[read_loc] = 0;
-			if(fputs(receiveBuffer, stdout) == EOF) {
-				printf("\nError: fputs is bad\n");
-			}
-		}
-	}
-	memset(sendBuffer, '\0', sizeof(sendBuffer));
-   
-	if(read_loc < 0) {
-		printf("\nError: reading error\n");
-	}
-
+  
 	return 0;
 }
