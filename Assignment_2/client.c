@@ -39,10 +39,13 @@ Steps:
 #define FALSE 0
 #define TRUE 1
 
+char receiveBuffer[BUFFSIZE];
+char sendBuffer[BUFFSIZE];
+
 unsigned long hash;
 // simple hash function from 
 // https://stackoverflow.com/questions/7666509/hash-function-for-string
-unsigned long hash_str (const char *str) {
+unsigned long hash_str (unsigned char *str) {
     int c;
 
     while (c = *str++)
@@ -57,12 +60,13 @@ void wipe(char *buffer) {
 
 
 //TODO: add error checking for invalid username/password
-int authenticate(const char *uname, const char *password, char *receiveBuffer, char *sendBuffer, int sfd) {
+int authenticate(const char *uname, const char *password, int sfd) {
 	printf("uname: %s\n", uname);
 	printf("password: %s\n", password);
 	write(sfd, uname, strlen(uname));
 	memset(sendBuffer, '\0', sizeof(sendBuffer));
 
+	memset(receiveBuffer, '\0', sizeof(receiveBuffer));
 	//read for rand number sent from server
 	int read_res;
 	while((read_res = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
@@ -73,7 +77,7 @@ int authenticate(const char *uname, const char *password, char *receiveBuffer, c
 	memset(receiveBuffer, '\0', sizeof(receiveBuffer));
 
 	//create client hash and send to server for comparison
-	unsigned long client_hash = hash_str(password);
+	unsigned long client_hash = hash_str((unsigned char*)password);
 	sprintf(sendBuffer, "%ld", client_hash);
 	write(sfd, sendBuffer, strlen(sendBuffer));
 	memset(sendBuffer, '\0', sizeof(sendBuffer));
@@ -83,7 +87,12 @@ int authenticate(const char *uname, const char *password, char *receiveBuffer, c
 			printf("Auth failed\n");
 			return -1;
 		}
+		else if(strcmp(receiveBuffer, "authenticated") == 0){
+			printf("auth success\n");
+			return 0;
+		}
 	}
+	printf("gets here\n");
 
 	return 0;
 }
@@ -91,8 +100,6 @@ int authenticate(const char *uname, const char *password, char *receiveBuffer, c
 int main(int argc, char **argv) {
 	//first set up some connection variables
 	int sfd = 0, cfd = 0, read_loc=0, opt;
-	char receiveBuffer[BUFFSIZE];
-	char sendBuffer[BUFFSIZE];
 	char *command;
 	char *server;
 	struct sockaddr_in server_address;
@@ -153,10 +160,12 @@ int main(int argc, char **argv) {
 	int isCD = FALSE;
 	char *uname = "user";
 	char *password = "password";
-	if(authenticate(uname, password, receiveBuffer, sendBuffer, sfd) == -1){
+	if(authenticate(uname, password, sfd) == -1){
 		printf("Error: authentication failed\n");
 		exit(EXIT_FAILURE);
 	}
+
+	printf("command: %s\n", command);
 
     // read and send commands
     // if no specific command was specified.

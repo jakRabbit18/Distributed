@@ -58,10 +58,10 @@ things we need for a server
 #define FALSE 0
 #define TRUE 1
 
-int hash;
+unsigned long hash;
 // simple hash function from 
 // https://stackoverflow.com/questions/7666509/hash-function-for-string
-int hash_str (unsigned char *str) {
+unsigned long hash_str (unsigned char *str) {
     int c;
 
     while (c = *str++)
@@ -280,9 +280,10 @@ int main(int argc, char **argv) {
 
 			//user name checked out, generate a random number
 			memset(readBuffer, '\0', sizeof(readBuffer));
-			hash = rand();
+			hash = (unsigned long) rand();
+			printf("hash on server: %ld\n", hash);
 			sprintf(sendBuffer, "%ld", hash);
-			printf("hash on server: %s\n", sendBuffer);
+			printf("hash sent to client: %s\n", sendBuffer);
 			write(cfd, sendBuffer, strlen(sendBuffer));
 			printf("server password: %s\n", PASSWORD);
 			unsigned long local_hash = hash_str(PASSWORD);
@@ -298,6 +299,10 @@ int main(int argc, char **argv) {
 					write(cfd, sendBuffer, strlen(sendBuffer));
 					close(cfd);
 					return EXIT_FAILURE;
+				}
+				else{
+					sprintf(sendBuffer, "%s", "authenticated");
+					write(cfd, sendBuffer, strlen(sendBuffer));
 				}
 				break;
 			}
