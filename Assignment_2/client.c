@@ -34,6 +34,7 @@ Steps:
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <fcntl.h>
 
 #define BUFFSIZE 1024
 #define FALSE 0
@@ -99,7 +100,8 @@ int authenticate(const char *uname, const char *password, int sfd) {
 
 int main(int argc, char **argv) {
 	//first set up some connection variables
-	int sfd = 0, cfd = 0, read_loc = 0,opt;
+	int sfd = 0, cfd = 0,opt;
+	ssize_t read_loc;
 	char *command;
 	char *server;
 	struct sockaddr_in server_address;
@@ -111,6 +113,7 @@ int main(int argc, char **argv) {
 				break;
 			case 'c':
 				//set the command to execute
+				// printf("Found a command!\n");
 				command = optarg;
 				break;
 			case 'h':
@@ -167,8 +170,13 @@ int main(int argc, char **argv) {
 
 	// read and send commands
     // if no specific command was specified.
-	if(command != NULL) {
-		printf("command: %s\n", command);
+    struct timeval tv;
+	tv.tv_sec = 2;
+	tv.tv_usec = 0;
+	setsockopt(sfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+
+	if(command) {
+		// printf("command: %s\n", command);
 		// this has been set, let's just put it in the send buffer and be done with it
 		if(strlen(command) > BUFFSIZE-1){
 			printf("Error: command contains too many characters\n");
@@ -185,13 +193,20 @@ int main(int argc, char **argv) {
 		isCD = strcmp(sendBuffer, "cd") == 0;
 
 		// this bit reads the socket for the response from the server (no response from cd)
+		
 		if(!isCD){
-			if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
+			int blocks = 0;
+			while((read_loc = recv(sfd, receiveBuffer, sizeof(receiveBuffer)-1, 0)) > 0) {
 				receiveBuffer[read_loc] = 0;
+				blocks++;
 				if(fputs(receiveBuffer, stdout) == EOF) {
 					printf("\nError: fputs is bad\n");
 				}
 			}
+		}
+		char *end = "exit";
+		if(write(sfd, end, strlen("exit")) == -1) {
+			printf("Error: %s\n", strerror(errno));
 		}
 
 	} else {
@@ -212,7 +227,7 @@ int main(int argc, char **argv) {
 					memset(sendBuffer, '\0', sizeof(sendBuffer));
 				}
 			}
-			printf("Sending %s\n", sendBuffer);
+			// printf("Sending %s\n", sendBuffer);
 			sendBuffer[buff_idx] = '\0';
 			buff_idx = 0;
 			if(write(sfd, sendBuffer, strlen(sendBuffer)) == -1) {
@@ -224,9 +239,9 @@ int main(int argc, char **argv) {
 			}
 
 			memset(sendBuffer, '\0', sizeof(sendBuffer));
-			// this bit reads the socket for the response from the server (no response from cd)
+			
 			if(!isCD){
-				while((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
+				while((read_loc = recv(sfd, receiveBuffer, sizeof(receiveBuffer)-1,0)) > 0) {
 					receiveBuffer[read_loc] = 0;
 					if(fputs(receiveBuffer, stdout) == EOF) {
 						printf("\nError: fputs is bad\n");
@@ -235,6 +250,7 @@ int main(int argc, char **argv) {
 			}
 		}
 	}
-  
+  	
+  	printf("\nend shell\n");
 	return 0;
 }

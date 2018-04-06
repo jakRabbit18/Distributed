@@ -111,22 +111,22 @@ struct Node{
 /* Function to add a node at the beginning of Linked List. */
 struct Node * push(struct Node* head_ref, pid_t new_data) {
     // Allocate memory for node
-    printf("Pushing new data %ld\n", (long) new_data);
+    // printf("Pushing new data %ld\n", (long) new_data);
     struct Node* new_node = (struct Node*) malloc(sizeof(struct Node));
  	
- 	printf("adding pid: %ld\n", (long) new_data);
+ 	// printf("adding pid: %ld\n", (long) new_data);
     new_node->pid = new_data;
-    printf("updating head ref\n");
+    // printf("updating head ref\n");
     new_node->next = head_ref;
     // Change head pointer as new node is added at the beginning
-    printf("updating head ref to be new node\n");
+    // printf("updating head ref to be new node\n");
     head_ref = new_node;
     return new_node;
 }
 
 /* function to remove a node from the list */
 struct Node *delete_node(struct Node *head, pid_t pid){
-	printf("deleteing pid %d\n", pid);
+	// printf("deleteing pid %d\n", pid);
 	struct Node *n;
 	// if there's no head, there's no pid in the list
 	// if there is a head and there's no next node, 
@@ -138,7 +138,7 @@ struct Node *delete_node(struct Node *head, pid_t pid){
 	// 	free n
 	// if none of that matched, call it on the next node
 	if(head == NULL) {
-		printf("No pids in the list\n");
+		printf("No processes in the list\n");
 		return NULL;
 	}
 
@@ -170,7 +170,7 @@ int execute_command(char **args){
 	if(cmd_pid == 0){
 		//child proc
 		if(execvp(args[0], args) == -1) {
-			printf("Could not execute command, try another.\n");
+			printf("Error in execvp: %s\n", strerror(errno));
 		}
 	}
 	else if (cmd_pid < 0){
@@ -182,13 +182,13 @@ int execute_command(char **args){
 			cmd_wpid = waitpid(cmd_pid, &cmd_status, WUNTRACED);
 		} while (!WIFEXITED(cmd_status) && !WIFSIGNALED(cmd_status));
 	}
-	return 1;
+	return 0;
 }
 
 int execute_help(){
 	printf("distributed shell\n");
 	//specify possible command line options here
-	return 1;
+	return 0;
 }
 
 int execute_cd(char **args){
@@ -197,7 +197,7 @@ int execute_cd(char **args){
 	if(chdir(args[1]) != 0){
 		perror("cd failed");
 	}
-	return 1;
+	return 0;
 }
 
 int main(int argc, char **argv) {
@@ -240,11 +240,11 @@ int main(int argc, char **argv) {
 		if(pid != 0) {
 			// this is the parent, hang around and wait for the child to return
 			// while also waiting for more clients
-			printf("Parent: %ld\n", (long) pid);
+			// printf("Parent: %ld\n", (long) pid);
 			pid_head = push(pid_head, pid);
 
 			pid_t child = waitpid(-1, &status, WNOHANG);
-			printf("child returned: %ld\n", (long) child);
+			// printf("child returned: %ld\n", (long) child);
 			if(child > 0) {
 				// a child has returned! remove it from the list
 				delete_node(pid_head, child);
@@ -262,11 +262,11 @@ int main(int argc, char **argv) {
 			// this is the child process, where all the magic happens
 			printf("Connected!\n");
 			pid_t me = getpid();
-			printf("Child pid: %ld\n", (long) me);
+			// printf("Child pid: %ld\n", (long) me);
 
 			// close the listening socket
 			//close(lfd);
-			printf("close lfd\n");
+			// printf("close lfd\n");
 
 			// check the user name given
 			while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0) {
@@ -281,17 +281,17 @@ int main(int argc, char **argv) {
 			//user name checked out, generate a random number
 			memset(readBuffer, '\0', sizeof(readBuffer));
 			hash = (unsigned long) rand();
-			printf("hash on server: %ld\n", hash);
+			// printf("hash on server: %ld\n", hash);
 			sprintf(sendBuffer, "%ld", hash);
-			printf("hash sent to client: %s\n", sendBuffer);
+			// printf("hash sent to client: %s\n", sendBuffer);
 			write(cfd, sendBuffer, strlen(sendBuffer));
-			printf("server password: %s\n", PASSWORD);
+			// printf("server password: %s\n", PASSWORD);
 			unsigned long local_hash = hash_str(PASSWORD);
 
 			while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0) {
 				unsigned long foreign_hash = strtoul(readBuffer, NULL, 10);
-				printf("local hash: %ld\n", local_hash);
-				printf("foreign hash: %ld\n", foreign_hash);
+				// printf("local hash: %ld\n", local_hash);
+				// printf("foreign hash: %ld\n", foreign_hash);
 				readBuffer[read_res] = '\0';
 				if(local_hash != foreign_hash) {
 					printf("failing in hash comparison\n");
@@ -320,6 +320,7 @@ int main(int argc, char **argv) {
 			while(!exit){
 				while((read_res = read(cfd, readBuffer, sizeof(readBuffer)-1)) > 0){
 					readBuffer[read_res] = '\0';
+					// printf("Recieved the following: %s\n", readBuffer);
 					if(strcmp(readBuffer, "exit") == 0) {
 						exit = TRUE;
 						break;
@@ -331,9 +332,11 @@ int main(int argc, char **argv) {
 					}
 					else if(strcmp(args[0], "cd") == 0){
 						execute_cd(args);
+						printf("%d", EOF);
 					}
 					else{
 						execute_command(args);
+						printf("%d", EOF);
 					}
 					// TODO:
 					// add specific commands (cd, help, etc)
@@ -346,7 +349,7 @@ int main(int argc, char **argv) {
 			close(cfd);
 			cfd = 0;
 			memset(readBuffer, '\0', sizeof(readBuffer));
-			printf("ending child process %ld...\n", (long) me);
+			// printf("ending child process %ld...\n", (long) me);
 			break;
 		}
 	}
@@ -356,13 +359,13 @@ int main(int argc, char **argv) {
 	}
 
 	while(pid_head != NULL && pid != 0){
-		printf("waiting for children of %ld to finish\n", (long) getpid());
+		// printf("waiting for children of %ld to finish\n", (long) getpid());
 		pid_t child = wait(0);
 		// a child has returned! remove it from the list
 		delete_node(pid_head, child);
 	}
 
 	close(cfd);
-	printf("PID %d ended successfully\n", getpid());
+	// printf("PID %d ended successfully\n", getpid());
 	return 0;
 }
