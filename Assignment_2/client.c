@@ -167,7 +167,7 @@ int main(int argc, char **argv) {
 
 	// read and send commands
     // if no specific command was specified.
-	if(command != NULL) {
+	if(strlen(command) > 0) {
 		printf("command: %s\n", command);
 		// this has been set, let's just put it in the send buffer and be done with it
 		if(strlen(command) > BUFFSIZE-1){
@@ -226,7 +226,7 @@ int main(int argc, char **argv) {
 			memset(sendBuffer, '\0', sizeof(sendBuffer));
 			// this bit reads the socket for the response from the server (no response from cd)
 			if(!isCD){
-				while((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
+				if((read_loc = read(sfd, receiveBuffer, sizeof(receiveBuffer)-1)) > 0) {
 					receiveBuffer[read_loc] = 0;
 					if(fputs(receiveBuffer, stdout) == EOF) {
 						printf("\nError: fputs is bad\n");
